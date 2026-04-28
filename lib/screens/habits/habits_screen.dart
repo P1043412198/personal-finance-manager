@@ -139,6 +139,8 @@ class _HabitCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          _Heatmap(habitId: habit.id, color: Color(habit.colorValue)),
+          const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: () => app.toggleHabit(habit.id, today),
             icon: Icon(doneToday ? Icons.check_circle : Icons.radio_button_unchecked),
@@ -147,6 +149,58 @@ class _HabitCard extends StatelessWidget {
               backgroundColor: doneToday ? AppColors.income : Color(habit.colorValue),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Heatmap extends StatelessWidget {
+  final String habitId;
+  final Color color;
+  const _Heatmap({required this.habitId, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    const weeks = 12;
+    final days = app.habitDays(habitId).toSet();
+    final today = DateTime.now();
+    final start = today.subtract(Duration(days: weeks * 7 - 1));
+    return SizedBox(
+      height: 7 * 12.0 + 6 * 2,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var w = 0; w < weeks; w++)
+            Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: Column(
+                children: [
+                  for (var d = 0; d < 7; d++)
+                    () {
+                      final date = start.add(Duration(days: w * 7 + d));
+                      if (date.isAfter(today)) {
+                        return const SizedBox(width: 12, height: 12);
+                      }
+                      final key =
+                          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+                      final done = days.contains(key);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: done ? color : color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      );
+                    }(),
+                ],
+              ),
+            ),
         ],
       ),
     );

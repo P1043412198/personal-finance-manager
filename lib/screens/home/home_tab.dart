@@ -33,6 +33,28 @@ class HomeTab extends StatelessWidget {
     final percent = planned > 0 ? (remaining / planned).clamp(0.0, 1.0) : 0.0;
 
     final recent = app.txAll().take(3).toList();
+    final today = DateTime(now.year, now.month, now.day);
+    final spentToday = app.txAll()
+        .where((t) =>
+            t.type == TxType.expense &&
+            t.date.year == today.year &&
+            t.date.month == today.month &&
+            t.date.day == today.day)
+        .fold<double>(0, (a, t) => a + t.amount);
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final daysLeft = (daysInMonth - now.day + 1).clamp(1, daysInMonth);
+    final avgPerDayLeft = remaining > 0 ? remaining / daysLeft : 0.0;
+
+    // Anomaly detection: compare today's spend to 14-day average
+    final last14 = app.txAll()
+        .where((t) => t.type == TxType.expense &&
+            t.date.isAfter(now.subtract(const Duration(days: 14))) &&
+            !(t.date.year == today.year && t.date.month == today.month && t.date.day == today.day))
+        .toList();
+    final avg14 = last14.isEmpty
+        ? 0.0
+        : last14.fold<double>(0, (a, t) => a + t.amount) / 14;
+    final isAnomaly = avg14 > 0 && spentToday > avg14 * 1.8;
 
     return Scaffold(
       body: SafeArea(
@@ -195,6 +217,59 @@ class HomeTab extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 14),
+            AppCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(i18n.t('today_summary'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 14)),
+                      const SizedBox(height: 6),
+                      Text('${i18n.t('spent_today')}: ${Fmt.currency(spentToday, symbol: app.currency)}',
+                          style: const TextStyle(color: AppColors.textPrimary)),
+                      const SizedBox(height: 2),
+                      Text(
+                          '${Fmt.currency(avgPerDayLeft, symbol: app.currency)} / ${i18n.t('avg_per_day').toLowerCase()}',
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12)),
+                      if (isAnomaly) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Text('⚠️', style: TextStyle(fontSize: 12)),
+                            const SizedBox(width: 4),
+                            Text(i18n.t('anomaly'),
+                                style: const TextStyle(
+                                    color: AppColors.warning,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600)),
+                          ]),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.muted,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('📅', style: TextStyle(fontSize: 28)),
+                ),
+              ]),
             ),
             const SizedBox(height: 18),
             SectionHeader(title: i18n.t('quick_actions')),

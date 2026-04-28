@@ -18,17 +18,53 @@ class AppColors {
   static const income = Color(0xFF2E7D32);
 }
 
+class AppPalette {
+  final String key;
+  final String label;
+  final Color seed;
+  final Color lightBg;
+  final Color darkBg;
+  final Color muted;
+  const AppPalette({
+    required this.key,
+    required this.label,
+    required this.seed,
+    required this.lightBg,
+    required this.darkBg,
+    required this.muted,
+  });
+}
+
+const kPalettes = <AppPalette>[
+  AppPalette(key: 'green', label: 'Green', seed: Color(0xFF2E7D32),
+    lightBg: Color(0xFFF7F8F7), darkBg: Color(0xFF101410), muted: Color(0xFFEFF3EE)),
+  AppPalette(key: 'blue', label: 'Blue', seed: Color(0xFF1565C0),
+    lightBg: Color(0xFFF6F8FB), darkBg: Color(0xFF0E141C), muted: Color(0xFFE9EFF7)),
+  AppPalette(key: 'purple', label: 'Purple', seed: Color(0xFF6A1B9A),
+    lightBg: Color(0xFFFAF7FB), darkBg: Color(0xFF160E1A), muted: Color(0xFFF1EAF5)),
+  AppPalette(key: 'orange', label: 'Orange', seed: Color(0xFFE65100),
+    lightBg: Color(0xFFFCF8F4), darkBg: Color(0xFF1A130C), muted: Color(0xFFF7EDDF)),
+  AppPalette(key: 'pink', label: 'Pink', seed: Color(0xFFC2185B),
+    lightBg: Color(0xFFFCF6F8), darkBg: Color(0xFF1A0E14), muted: Color(0xFFF7E8EE)),
+  AppPalette(key: 'teal', label: 'Teal', seed: Color(0xFF00796B),
+    lightBg: Color(0xFFF4FAF8), darkBg: Color(0xFF0B1614), muted: Color(0xFFE3F1EC)),
+];
+
+AppPalette paletteByKey(String key) =>
+    kPalettes.firstWhere((p) => p.key == key, orElse: () => kPalettes.first);
+
 class AppTheme {
-  static ThemeData light() {
+  static ThemeData light({String paletteKey = 'green'}) {
+    final p = paletteByKey(paletteKey);
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
+        seedColor: p.seed,
         brightness: Brightness.light,
-        primary: AppColors.primary,
+        primary: p.seed,
         surface: AppColors.surface,
       ),
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: p.lightBg,
       fontFamily: 'Roboto',
     );
     return base.copyWith(
@@ -52,7 +88,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: p.seed,
           foregroundColor: Colors.white,
           elevation: 0,
           minimumSize: const Size(double.infinity, 52),
@@ -62,16 +98,16 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: p.seed,
           minimumSize: const Size(double.infinity, 52),
-          side: const BorderSide(color: AppColors.primary, width: 1.4),
+          side: BorderSide(color: p.seed, width: 1.4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: p.seed,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -79,7 +115,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.muted,
+        fillColor: p.muted,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -90,23 +126,23 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+          borderSide: BorderSide(color: p.seed, width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: const TextStyle(color: AppColors.textSecondary),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.muted,
-        selectedColor: AppColors.primary,
+        backgroundColor: p.muted,
+        selectedColor: p.seed,
         labelStyle: const TextStyle(color: AppColors.textPrimary),
         secondaryLabelStyle: const TextStyle(color: Colors.white),
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dividerTheme: const DividerThemeData(color: Color(0xFFEFEFEF), thickness: 1),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
+        selectedItemColor: p.seed,
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
@@ -116,13 +152,13 @@ class AppTheme {
         backgroundColor: Colors.white,
         elevation: 8,
         height: 68,
-        indicatorColor: AppColors.muted,
+        indicatorColor: p.muted,
         labelTextStyle: WidgetStateProperty.all(
           const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: p.seed,
         foregroundColor: Colors.white,
       ),
       textTheme: base.textTheme.apply(
@@ -132,16 +168,17 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({String paletteKey = 'green'}) {
+    final p = paletteByKey(paletteKey);
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
+        seedColor: p.seed,
         brightness: Brightness.dark,
       ),
     );
     return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFF101410),
+      scaffoldBackgroundColor: p.darkBg,
       cardTheme: CardTheme(
         color: const Color(0xFF1B201B),
         elevation: 0,
@@ -154,7 +191,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: p.seed,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -167,6 +204,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: p.seed,
+        foregroundColor: Colors.white,
       ),
     );
   }
