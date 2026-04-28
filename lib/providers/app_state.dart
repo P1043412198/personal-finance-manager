@@ -112,13 +112,15 @@ class AppState extends ChangeNotifier {
   final habitLogs = KvStore('habit_logs');
   final prefs = KvStore('prefs');
 
-  String currency = '₽';
+  String currency = 'Br';
   String userName = '';
   ThemeMode themeMode = ThemeMode.system;
   bool onboardingDone = false;
   String themePalette = 'green';
   bool notificationsEnabled = true;
   bool secureScreen = false;
+  bool amoled = false;
+  bool dynamicColors = false;
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -144,10 +146,12 @@ class AppState extends ChangeNotifier {
     final sp = await SharedPreferences.getInstance();
     onboardingDone = sp.getBool('onboarding_done') ?? false;
     userName = sp.getString('user_name') ?? '';
-    currency = sp.getString('currency') ?? '₽';
+    currency = sp.getString('currency') ?? 'Br';
     themePalette = sp.getString('theme_palette') ?? 'green';
     notificationsEnabled = sp.getBool('notifications_enabled') ?? true;
     secureScreen = sp.getBool('secure_screen') ?? false;
+    amoled = sp.getBool('amoled') ?? false;
+    dynamicColors = sp.getBool('dynamic_colors') ?? false;
     final tmIdx = sp.getInt('theme_mode') ?? 0;
     themeMode = ThemeMode.values[tmIdx.clamp(0, ThemeMode.values.length - 1)];
 
@@ -156,6 +160,9 @@ class AppState extends ChangeNotifier {
     }
     if (rates.all().isEmpty) {
       await _seedRates();
+    }
+    if (rules.all().isEmpty) {
+      await _seedBelarusRules();
     }
 
     await runDueRecurring();
@@ -184,15 +191,78 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _seedRates() async {
+    // Base = BYN. Approximate rates relative to 1 BYN.
     final defaults = <CurrencyRate>[
-      CurrencyRate(code: 'RUB', symbol: '₽', toBase: 1.0),
-      CurrencyRate(code: 'USD', symbol: '\$', toBase: 90.0),
-      CurrencyRate(code: 'EUR', symbol: '€', toBase: 100.0),
-      CurrencyRate(code: 'GBP', symbol: '£', toBase: 115.0),
-      CurrencyRate(code: 'KZT', symbol: '₸', toBase: 0.20),
-      CurrencyRate(code: 'BYN', symbol: 'Br', toBase: 28.0),
+      CurrencyRate(code: 'BYN', symbol: 'Br', toBase: 1.0),
+      CurrencyRate(code: 'USD', symbol: '\$', toBase: 3.27),
+      CurrencyRate(code: 'EUR', symbol: '€', toBase: 3.55),
+      CurrencyRate(code: 'RUB', symbol: '₽', toBase: 0.036),
+      CurrencyRate(code: 'PLN', symbol: 'zł', toBase: 0.83),
+      CurrencyRate(code: 'UAH', symbol: '₴', toBase: 0.082),
     ];
     await rates.putAll(defaults);
+  }
+
+  Future<void> _seedBelarusRules() async {
+    final cats = categories.all();
+    String? catFor(String name) => cats.firstWhere(
+          (c) => c.name.toLowerCase().startsWith(name.toLowerCase()),
+          orElse: () => CategoryModel(id: '', name: '', colorValue: 0, iconKey: '', scopes: const {}),
+        ).id.isEmpty ? null : cats.firstWhere(
+          (c) => c.name.toLowerCase().startsWith(name.toLowerCase()),
+        ).id;
+    final groceriesId = catFor('Продукты');
+    final foodId = catFor('Еда');
+    final transportId = catFor('Транспорт');
+    final utilId = catFor('Комм');
+    final shoppingId = catFor('Покупки');
+    final entId = catFor('Развлечения');
+    final healthId = catFor('Здоровье');
+    final byShops = <String, String?>{
+      'Евроопт': groceriesId,
+      'Корона': groceriesId,
+      'Соседи': groceriesId,
+      'Виталюр': groceriesId,
+      'Простор': groceriesId,
+      'Гиппо': groceriesId,
+      'Санта': groceriesId,
+      'Mart Inn': groceriesId,
+      'Грошы': groceriesId,
+      'АЛМИ': groceriesId,
+      'РубльОК': groceriesId,
+      'McDonald': foodId,
+      'KFC': foodId,
+      'Додо': foodId,
+      'PIZZA': foodId,
+      'Суши': foodId,
+      'OZ': shoppingId,
+      'Электросила': shoppingId,
+      '21 век': shoppingId,
+      'Технобанк': shoppingId,
+      'Метро': transportId,
+      'МПС': transportId,
+      'A1': utilId,
+      'МТС': utilId,
+      'life:)': utilId,
+      'Белтелеком': utilId,
+      'Жилкомхоз': utilId,
+      'Минскэнерго': utilId,
+      'Apteka': healthId,
+      'Аптека': healthId,
+      'Kinopark': entId,
+      'Silver Screen': entId,
+      'Falcon Club': entId,
+    };
+    final newRules = <CategoryRule>[];
+    for (final entry in byShops.entries) {
+      if (entry.value == null) continue;
+      newRules.add(CategoryRule(
+        id: _uuid.v4(),
+        matchShop: entry.key,
+        categoryId: entry.value!,
+      ));
+    }
+    if (newRules.isNotEmpty) await rules.putAll(newRules);
   }
 
   String newId() => _uuid.v4();
@@ -641,6 +711,20 @@ class AppState extends ChangeNotifier {
     secureScreen = v;
     final sp = await SharedPreferences.getInstance();
     await sp.setBool('secure_screen', v);
+    notifyListeners();
+  }
+
+  Future<void> setAmoled(bool v) async {
+    amoled = v;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool('amoled', v);
+    notifyListeners();
+  }
+
+  Future<void> setDynamicColors(bool v) async {
+    dynamicColors = v;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool('dynamic_colors', v);
     notifyListeners();
   }
 

@@ -1,19 +1,27 @@
 import 'package:flutter/widgets.dart';
 
-enum AppLang { ru, en }
+enum AppLang { ru, en, be }
 
 class I18n extends ChangeNotifier {
   AppLang _lang = AppLang.ru;
   AppLang get lang => _lang;
 
-  Locale get locale => _lang == AppLang.ru ? const Locale('ru') : const Locale('en');
+  Locale get locale => switch (_lang) {
+        AppLang.ru => const Locale('ru'),
+        AppLang.en => const Locale('en'),
+        AppLang.be => const Locale('be'),
+      };
 
   void setLang(AppLang l) {
     _lang = l;
     notifyListeners();
   }
 
-  String t(String key) => _strings[_lang]?[key] ?? _strings[AppLang.en]?[key] ?? key;
+  String t(String key) =>
+      _strings[_lang]?[key] ??
+      _strings[AppLang.ru]?[key] ??
+      _strings[AppLang.en]?[key] ??
+      key;
 
   static const Map<AppLang, Map<String, String>> _strings = {
     AppLang.ru: {
@@ -501,6 +509,41 @@ class I18n extends ChangeNotifier {
       'filter': 'Filter',
       'from': 'From',
       'to': 'To',
+    },
+    AppLang.be: {
+      'app_title': 'Асабісты мэнэджэр',
+      'home': 'Галоўная',
+      'operations': 'Аперацыі',
+      'budget': 'Бюджэт',
+      'learn': 'Навучанне',
+      'profile': 'Профіль',
+      'income': 'Прыбытак',
+      'expense': 'Выдатак',
+      'expenses': 'Выдаткі',
+      'today': 'Сёння',
+      'yesterday': 'Учора',
+      'all': 'Усе',
+      'add': 'Дадаць',
+      'save': 'Захаваць',
+      'delete': 'Выдаліць',
+      'cancel': 'Адмена',
+      'apply': 'Ужыць',
+      'reset': 'Скінуць',
+      'yes': 'Так',
+      'no': 'Не',
+      'no_data': 'Пакуль няма даных',
+      'wallets': 'Кашалькі',
+      'recurring': 'Рэгулярныя',
+      'debts': 'Даўгі',
+      'rules': 'Правілы',
+      'templates': 'Шаблоны',
+      'finance': 'Фінансы',
+      'security': 'Бяспека',
+      'tools': 'Інструменты',
+      'today_summary': 'Вынік за сёння',
+      'spent_today': 'выдаткавана',
+      'remaining_today': 'засталося ў сярэднім за дзень',
+      'anomaly': 'Незвычайны выдатак',
     },
   };
 }

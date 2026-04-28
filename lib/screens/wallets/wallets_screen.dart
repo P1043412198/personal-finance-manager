@@ -57,29 +57,56 @@ class WalletsScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: AppCard(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: ListTile(
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Color(w.colorValue).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
+                child: Column(children: [
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Color(w.colorValue).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(_iconOf(w.type), color: Color(w.colorValue)),
                     ),
-                    child: Icon(_iconOf(w.type), color: Color(w.colorValue)),
-                  ),
-                  title: Text(w.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(_typeLabel(w.type, i18n)),
-                  trailing: Text(
-                    Fmt.currency(w.balance, symbol: w.currency),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: w.balance < 0 ? AppColors.expense : AppColors.income,
+                    title: Text(w.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(_typeLabel(w.type, i18n)),
+                    trailing: Text(
+                      Fmt.currency(w.balance, symbol: w.currency),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: w.balance < 0 ? AppColors.expense : AppColors.income,
+                      ),
                     ),
+                    onTap: () => _edit(context, w),
                   ),
-                  onTap: () => _edit(context, w),
-                ),
+                  if (w.sinkingProgress != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: w.sinkingProgress,
+                              minHeight: 6,
+                              backgroundColor: AppColors.muted,
+                              color: Color(w.colorValue),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Цель ${Fmt.currency(w.targetAmount!, symbol: w.currency)} '
+                            '· ${(w.sinkingProgress! * 100).toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                ]),
               ),
             ),
         ],
@@ -172,9 +199,14 @@ class _WalletFormState extends State<_WalletForm> {
     nameC = TextEditingController(text: e?.name ?? '');
     balC = TextEditingController(text: e?.balance.toStringAsFixed(2) ?? '0');
     type = e?.type ?? WalletType.card;
-    currency = e?.currency ?? '₽';
+    currency = e?.currency ?? 'Br';
     color = e?.colorValue ?? _colors.first;
+    targetC = TextEditingController(text: e?.targetAmount?.toStringAsFixed(0) ?? '');
+    targetDate = e?.targetDate;
   }
+
+  late TextEditingController targetC;
+  DateTime? targetDate;
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +244,34 @@ class _WalletFormState extends State<_WalletForm> {
             ),
         ]),
         const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: targetC,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                hintText: 'Sinking fund: цель',
+                helperText: 'Накопить эту сумму',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: targetDate ?? DateTime.now().add(const Duration(days: 90)),
+                firstDate: DateTime.now(),
+                lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+              );
+              if (picked != null) setState(() => targetDate = picked);
+            },
+            icon: const Icon(Icons.event),
+            label: Text(targetDate == null ? 'к дате' : '${targetDate!.day}.${targetDate!.month}.${targetDate!.year}'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
+          ),
+        ]),
+        const SizedBox(height: 12),
         Wrap(spacing: 8, children: [
           for (final c in _colors)
             GestureDetector(
@@ -242,6 +302,7 @@ class _WalletFormState extends State<_WalletForm> {
               onPressed: () {
                 if (nameC.text.trim().isEmpty) return;
                 final bal = double.tryParse(balC.text.replaceAll(',', '.')) ?? 0;
+                final tgt = double.tryParse(targetC.text.replaceAll(',', '.'));
                 final w = WalletModel(
                   id: widget.existing?.id ?? app.newId(),
                   name: nameC.text.trim(),
@@ -249,6 +310,8 @@ class _WalletFormState extends State<_WalletForm> {
                   balance: bal,
                   currency: currency,
                   colorValue: color,
+                  targetAmount: tgt,
+                  targetDate: targetDate,
                 );
                 widget.onSave(w);
               },

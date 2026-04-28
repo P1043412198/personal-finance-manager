@@ -5,6 +5,8 @@ import '../../models/category.dart';
 import '../../models/transaction.dart';
 import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../services/voice_input.dart';
+import '../../utils/calc.dart';
 import '../../utils/format.dart';
 import '../../utils/i18n.dart';
 
@@ -50,7 +52,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   }
 
   Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.').replaceAll(' ', ''));
+    final amount = evalAmount(_amountCtrl.text) ??
+        double.tryParse(_amountCtrl.text.replaceAll(',', '.').replaceAll(' ', ''));
     if (amount == null || amount <= 0) return;
     final app = context.read<AppState>();
     final tx = TransactionModel(
@@ -88,6 +91,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         title: Text(i18n.t('new_purchase'), style: const TextStyle(fontSize: 18)),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: 'Голосовой ввод',
+            onPressed: () async {
+              final r = await VoiceInput.listen(context);
+              if (r == null || !mounted) return;
+              setState(() {
+                if (r.amount != null) _amountCtrl.text = r.amount!.toStringAsFixed(0);
+                if (r.shop != null) _shopCtrl.text = r.shop!;
+              });
+            },
+            icon: const Icon(Icons.mic_none),
+          ),
           if (widget.existing != null)
             IconButton(
               onPressed: () async {
@@ -110,6 +125,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               controller: _amountCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
+              onChanged: (_) => setState(() {}),
               style: const TextStyle(
                 fontSize: 38,
                 fontWeight: FontWeight.w700,
@@ -125,6 +141,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 focusedBorder: InputBorder.none,
               ),
             ),
+            if (_amountCtrl.text.isNotEmpty &&
+                RegExp(r'[+\-*/]').hasMatch(_amountCtrl.text))
+              Builder(builder: (_) {
+                final v = evalAmount(_amountCtrl.text);
+                if (v == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '= ${Fmt.currency(v, symbol: app.currency)}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 14),
+                  ),
+                );
+              }),
             const SizedBox(height: 12),
             _DropdownTile(
               icon: selectedCat.id.isEmpty ? '📦' : CategoryIcons.resolve(selectedCat.iconKey),
@@ -194,9 +225,27 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               },
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: _shopCtrl,
-              decoration: InputDecoration(hintText: i18n.t('shop')),
+            Autocomplete<String>(
+              initialValue: TextEditingValue(text: _shopCtrl.text),
+              optionsBuilder: (v) {
+                final q = v.text.trim().toLowerCase();
+                if (q.isEmpty) return const Iterable<String>.empty();
+                final all = app.txAll()
+                    .map((t) => t.shop ?? '')
+                    .where((s) => s.isNotEmpty && s.toLowerCase().contains(q))
+                    .toSet()
+                    .toList();
+                return all.take(6);
+              },
+              onSelected: (s) => _shopCtrl.text = s,
+              fieldViewBuilder: (ctx, ctrl, focus, onSubmit) {
+                _shopCtrl = ctrl;
+                return TextField(
+                  controller: ctrl,
+                  focusNode: focus,
+                  decoration: InputDecoration(hintText: i18n.t('shop')),
+                );
+              },
             ),
             const SizedBox(height: 8),
             TextField(

@@ -1,3 +1,4 @@
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('ru');
   await initializeDateFormatting('en');
+  await initializeDateFormatting('be');
 
   final state = AppState();
   await state.init();
@@ -87,16 +89,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       child: Consumer2<AppState, I18n>(
         builder: (context, app, i18n, _) {
           _applySecure(app.secureScreen);
-          return MaterialApp(
+          return DynamicColorBuilder(builder: (lightDyn, darkDyn) {
+            final useDyn = app.dynamicColors;
+            return MaterialApp(
             title: i18n.t('app_title'),
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(paletteKey: app.themePalette),
-            darkTheme: AppTheme.dark(paletteKey: app.themePalette),
+            theme: AppTheme.light(
+                paletteKey: app.themePalette,
+                dynamicScheme: useDyn ? lightDyn?.harmonized() : null),
+            darkTheme: AppTheme.dark(
+                paletteKey: app.themePalette,
+                dynamicScheme: useDyn ? darkDyn?.harmonized() : null,
+                amoled: app.amoled),
             themeMode: app.themeMode,
             locale: i18n.locale,
             supportedLocales: const [
               Locale('ru'),
               Locale('en'),
+              Locale('be'),
             ],
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -105,6 +115,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             ],
             home: _buildHome(app),
           );
+          });
         },
       ),
     );

@@ -11,6 +11,7 @@ import '../categories/categories_screen.dart';
 import '../debts/debts_screen.dart';
 import '../goals/goals_screen.dart';
 import '../habits/habits_screen.dart';
+import '../insights/insights_screen.dart';
 import '../notes/notes_screen.dart';
 import '../pomodoro/pomodoro_screen.dart';
 import '../recurring/recurring_screen.dart';
@@ -95,6 +96,9 @@ class ProfileTab extends StatelessWidget {
               _Tile(icon: '💱', title: i18n.t('currency_rates'),
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const CurrencyRatesScreen()))),
+              _Tile(icon: '🔮', title: 'Аналитика и прогноз',
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const InsightsScreen()))),
               _Tile(icon: '📊', title: i18n.t('analytics'),
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const AnalyticsScreen()))),
@@ -157,6 +161,14 @@ class ProfileTab extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
               ),
               RadioListTile<AppLang>(
+                value: AppLang.be,
+                groupValue: i18n.lang,
+                onChanged: (v) => v == null ? null : i18n.setLang(v),
+                title: const Text('Беларуская'),
+                activeColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              RadioListTile<AppLang>(
                 value: AppLang.en,
                 groupValue: i18n.lang,
                 onChanged: (v) => v == null ? null : i18n.setLang(v),
@@ -187,6 +199,18 @@ class ProfileTab extends StatelessWidget {
               _Tile(icon: '🎨', title: i18n.t('palette'),
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const PaletteScreen()))),
+              SwitchListTile(
+                value: app.amoled,
+                title: const Text('AMOLED (true black)'),
+                subtitle: const Text('Чёрный фон в тёмной теме — экономит OLED'),
+                onChanged: (v) => app.setAmoled(v),
+              ),
+              SwitchListTile(
+                value: app.dynamicColors,
+                title: const Text('Material You'),
+                subtitle: const Text('Подхватывать палитру из обоев (Android 12+)'),
+                onChanged: (v) => app.setDynamicColors(v),
+              ),
             ]),
           ),
           const SizedBox(height: 16),

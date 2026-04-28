@@ -1,6 +1,6 @@
 enum TxType { expense, income }
 
-enum PayMethod { card, cash, transfer }
+enum PayMethod { card, cash, transfer, erip, belkart }
 
 class TransactionModel {
   final String id;
@@ -20,7 +20,7 @@ class TransactionModel {
     required this.id,
     required this.type,
     required this.amount,
-    this.currency = '₽',
+    this.currency = 'Br',
     this.categoryId,
     this.walletId,
     this.shop,
@@ -51,7 +51,7 @@ class TransactionModel {
         type: TxType.values.firstWhere((e) => e.name == j['type'],
             orElse: () => TxType.expense),
         amount: (j['amount'] as num).toDouble(),
-        currency: j['currency'] as String? ?? '₽',
+        currency: j['currency'] as String? ?? 'Br',
         categoryId: j['categoryId'] as String?,
         walletId: j['walletId'] as String?,
         shop: j['shop'] as String?,

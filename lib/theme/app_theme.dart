@@ -54,11 +54,11 @@ AppPalette paletteByKey(String key) =>
     kPalettes.firstWhere((p) => p.key == key, orElse: () => kPalettes.first);
 
 class AppTheme {
-  static ThemeData light({String paletteKey = 'green'}) {
+  static ThemeData light({String paletteKey = 'green', ColorScheme? dynamicScheme}) {
     final p = paletteByKey(paletteKey);
     final base = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
+      colorScheme: dynamicScheme ?? ColorScheme.fromSeed(
         seedColor: p.seed,
         brightness: Brightness.light,
         primary: p.seed,
@@ -68,7 +68,7 @@ class AppTheme {
       fontFamily: 'Roboto',
     );
     return base.copyWith(
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.cardBg,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -168,19 +168,21 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark({String paletteKey = 'green'}) {
+  static ThemeData dark({String paletteKey = 'green', ColorScheme? dynamicScheme, bool amoled = false}) {
     final p = paletteByKey(paletteKey);
     final base = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
+      colorScheme: dynamicScheme ?? ColorScheme.fromSeed(
         seedColor: p.seed,
         brightness: Brightness.dark,
       ),
     );
+    final bg = amoled ? Colors.black : p.darkBg;
+    final cardBg = amoled ? const Color(0xFF0A0A0A) : const Color(0xFF1B201B);
     return base.copyWith(
-      scaffoldBackgroundColor: p.darkBg,
-      cardTheme: CardTheme(
-        color: const Color(0xFF1B201B),
+      scaffoldBackgroundColor: bg,
+      cardTheme: CardThemeData(
+        color: cardBg,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
@@ -199,7 +201,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF1B201B),
+        fillColor: cardBg,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,

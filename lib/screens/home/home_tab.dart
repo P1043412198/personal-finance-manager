@@ -271,6 +271,8 @@ class HomeTab extends StatelessWidget {
                 ),
               ]),
             ),
+            const SizedBox(height: 12),
+            _StreakCard(),
             const SizedBox(height: 18),
             SectionHeader(title: i18n.t('quick_actions')),
             _QuickActions(),
@@ -369,6 +371,74 @@ class HomeTab extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StreakCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final budget = app.budgetFor(now)?.totalLimit ?? 0;
+    final dailyLimit = budget > 0 ? budget / daysInMonth : 0;
+    // count consecutive previous days (incl. today if not over) where spend <= dailyLimit*1.2
+    var streak = 0;
+    final tx = app.txAll().where((t) => t.type == TxType.expense).toList();
+    for (var i = 0; i < 60; i++) {
+      final d = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+      final spent = tx
+          .where((t) =>
+              t.date.year == d.year &&
+              t.date.month == d.month &&
+              t.date.day == d.day)
+          .fold<double>(0, (a, t) => a + t.amount);
+      final ok = dailyLimit == 0 ? spent < 1 : spent <= dailyLimit * 1.2;
+      if (ok) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    final color = streak >= 7
+        ? AppColors.income
+        : (streak >= 3 ? AppColors.info : AppColors.warning);
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(streak == 0 ? '✨' : '🔥',
+              style: const TextStyle(fontSize: 28)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Серия без перерасхода',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(
+                  streak == 0
+                      ? 'Начни сегодня — придерживайся бюджета'
+                      : '$streak дней подряд держишься бюджета',
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12)),
+            ],
+          ),
+        ),
+        Text('$streak',
+            style: TextStyle(
+                fontSize: 28, fontWeight: FontWeight.w800, color: color)),
+      ]),
     );
   }
 }

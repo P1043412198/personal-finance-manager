@@ -21,6 +21,7 @@ import '../../models/transaction.dart';
 import '../../models/wallet.dart';
 import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../services/pdf_export.dart';
 import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
 
@@ -65,6 +66,13 @@ class ImportExportScreen extends StatelessWidget {
                 subtitle: Text(i18n.t('import_csv_hint'),
                     style: const TextStyle(fontSize: 12)),
                 onTap: () => _importCsv(context, app),
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf, color: AppColors.primary),
+                title: const Text('PDF отчёт за месяц'),
+                subtitle: const Text('Экспорт операций и сводки в PDF',
+                    style: TextStyle(fontSize: 12)),
+                onTap: () => PdfExport.exportMonth(app, DateTime.now()),
               ),
               ListTile(
                 leading: const Icon(Icons.backup, color: AppColors.primary),
