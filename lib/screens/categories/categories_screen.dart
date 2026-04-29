@@ -103,7 +103,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       showDragHandle: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _CategoryForm(existing: existing),
+        child: _CategoryForm(existing: existing, scope: _scope),
       ),
     );
   }
@@ -111,7 +111,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
 class _CategoryForm extends StatefulWidget {
   final CategoryModel? existing;
-  const _CategoryForm({this.existing});
+  final String scope;
+  const _CategoryForm({this.existing, required this.scope});
 
   @override
   State<_CategoryForm> createState() => _CategoryFormState();
@@ -254,7 +255,8 @@ class _CategoryFormState extends State<_CategoryForm> {
                       colorValue: _color.value,
                       iconKey: _icon,
                       scopes: _scopes,
-                      sortIndex: widget.existing?.sortIndex ?? 0,
+                      sortIndex: widget.existing?.sortIndex ??
+                          app.categoriesByScope(widget.scope).length,
                     );
                     await app.upsertCategory(c);
                     if (!mounted) return;

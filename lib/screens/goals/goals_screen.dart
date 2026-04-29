@@ -249,7 +249,8 @@ class _GoalFormState extends State<_GoalForm> {
                       iconKey: _icon,
                       colorValue: _color.value,
                       createdAt: widget.existing?.createdAt ?? DateTime.now(),
-                      sortIndex: widget.existing?.sortIndex ?? 0,
+                      sortIndex:
+                          widget.existing?.sortIndex ?? app.goalAll().length,
                     );
                     await app.upsertGoal(g);
                     if (!mounted) return;
