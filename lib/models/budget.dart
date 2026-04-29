@@ -19,6 +19,8 @@ class MonthlyBudget {
   double totalLimit;
   List<CategoryLimit> limits;
   String? template;
+  bool carryOver;
+  double carriedOver;
 
   MonthlyBudget({
     required this.monthKey,
@@ -26,7 +28,15 @@ class MonthlyBudget {
     required this.totalLimit,
     List<CategoryLimit>? limits,
     this.template,
+    this.carryOver = false,
+    this.carriedOver = 0,
   }) : limits = limits ?? [];
+
+  /// Sum of all per-category limits.
+  double get sumOfLimits => limits.fold<double>(0, (a, l) => a + l.limit);
+
+  /// Free funds = income (+ carried over) − sum of category limits.
+  double get freeFunds => income + carriedOver - sumOfLimits;
 
   Map<String, dynamic> toJson() => {
         'monthKey': monthKey,
@@ -34,6 +44,8 @@ class MonthlyBudget {
         'totalLimit': totalLimit,
         'limits': limits.map((e) => e.toJson()).toList(),
         'template': template,
+        'carryOver': carryOver,
+        'carriedOver': carriedOver,
       };
 
   factory MonthlyBudget.fromJson(Map j) => MonthlyBudget(
@@ -45,5 +57,7 @@ class MonthlyBudget {
                 .toList() ??
             [],
         template: j['template'] as String?,
+        carryOver: j['carryOver'] as bool? ?? false,
+        carriedOver: (j['carriedOver'] as num?)?.toDouble() ?? 0,
       );
 }

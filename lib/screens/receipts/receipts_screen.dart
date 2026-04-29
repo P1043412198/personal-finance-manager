@@ -19,6 +19,18 @@ class ReceiptsScreen extends StatefulWidget {
 
 class _ReceiptsScreenState extends State<ReceiptsScreen> {
   String _query = '';
+  DateTimeRange? _range;
+
+  Future<void> _pickRange(BuildContext context) async {
+    final now = DateTime.now();
+    final r = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: _range,
+    );
+    if (r != null) setState(() => _range = r);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,32 +41,65 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     final q = _query.trim().toLowerCase();
-    final filtered = q.isEmpty
-        ? all
-        : all.where((t) {
-            return (t.shop ?? '').toLowerCase().contains(q) ||
-                t.amount.toStringAsFixed(2).contains(q);
-          }).toList();
+    Iterable<TransactionModel> result = all;
+    if (q.isNotEmpty) {
+      result = result.where((t) =>
+          (t.shop ?? '').toLowerCase().contains(q) ||
+          t.amount.toStringAsFixed(2).contains(q));
+    }
+    if (_range != null) {
+      final from = DateTime(_range!.start.year, _range!.start.month, _range!.start.day);
+      final to = DateTime(_range!.end.year, _range!.end.month, _range!.end.day, 23, 59, 59);
+      result = result.where((t) => !t.date.isBefore(from) && !t.date.isAfter(to));
+    }
+    final filtered = result.toList();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Чеки'),
+        actions: [
+          IconButton(
+            tooltip: 'Период',
+            icon: Icon(_range == null ? Icons.date_range : Icons.event_available,
+                color: _range == null ? null : AppColors.primary),
+            onPressed: () => _pickRange(context),
+          ),
+          if (_range != null)
+            IconButton(
+              tooltip: 'Сбросить период',
+              icon: const Icon(Icons.clear),
+              onPressed: () => setState(() => _range = null),
+            ),
+        ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: Size.fromHeight(_range == null ? 56 : 80),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: TextField(
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
-                hintText: 'Поиск по магазину или сумме',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: 'Поиск по магазину или сумме',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
-              ),
+                if (_range != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Период: ${Fmt.shortDate(_range!.start)} – ${Fmt.shortDate(_range!.end)}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

@@ -317,7 +317,41 @@ class AppState extends ChangeNotifier {
     if (isNew) {
       _checkAchievements(triggeredBy: 'tx');
     }
+    if (t.type == TxType.expense && t.categoryId != null) {
+      await _checkLimitNotification(t);
+    }
     notifyListeners();
+  }
+
+  Future<void> _checkLimitNotification(TransactionModel t) async {
+    if (!notificationsEnabled) return;
+    final budget = budgetFor(DateTime(t.date.year, t.date.month));
+    if (budget == null) return;
+    final limit = budget.limits.firstWhere(
+      (l) => l.categoryId == t.categoryId,
+      orElse: () => CategoryLimit(categoryId: '', limit: 0),
+    );
+    if (limit.categoryId.isEmpty || limit.limit <= 0) return;
+    final spent = txInMonth(t.date)
+        .where((x) => x.type == TxType.expense && x.categoryId == t.categoryId)
+        .fold<double>(0, (a, x) => a + x.amount);
+    final ratio = spent / limit.limit;
+    final cat = categoryById(t.categoryId);
+    final name = cat?.name ?? '';
+    final notifKey = 'limit_${budget.monthKey}_${t.categoryId}';
+    if (ratio >= 1.0 && !(prefs.get('${notifKey}_100') == 1)) {
+      await NotificationService.instance.showNow(
+        title: 'Превышен лимит: $name',
+        body: 'Потрачено ${spent.toStringAsFixed(0)} из ${limit.limit.toStringAsFixed(0)} $currency',
+      );
+      await prefs.put('${notifKey}_100', 1);
+    } else if (ratio >= 0.8 && !(prefs.get('${notifKey}_80') == 1) && ratio < 1.0) {
+      await NotificationService.instance.showNow(
+        title: 'Близко к лимиту: $name',
+        body: 'Потрачено ${(ratio * 100).round()}% от лимита ${limit.limit.toStringAsFixed(0)} $currency',
+      );
+      await prefs.put('${notifKey}_80', 1);
+    }
   }
 
   Future<void> deleteTransaction(String id) async {
@@ -653,6 +687,24 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> upsertBudget(MonthlyBudget b) async {
+    // If carry-over enabled and previous month had a budget, compute leftover.
+    final parts = b.monthKey.split('-');
+    if (parts.length == 2 && b.carryOver) {
+      final y = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      if (y > 0 && m > 0) {
+        final prevMonth = DateTime(m == 1 ? y - 1 : y, m == 1 ? 12 : m - 1);
+        final prev = budgetFor(prevMonth);
+        if (prev != null) {
+          final prevPlan = prev.sumOfLimits > 0 ? prev.sumOfLimits : prev.totalLimit;
+          final prevSpent = txInMonth(prevMonth)
+              .where((t) => t.type == TxType.expense)
+              .fold<double>(0, (a, t) => a + t.amount);
+          final leftover = (prevPlan - prevSpent).clamp(0.0, double.infinity);
+          b.carriedOver = leftover;
+        }
+      }
+    }
     await budgets.put(b);
     _checkAchievements(triggeredBy: 'budget');
     notifyListeners();
