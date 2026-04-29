@@ -110,16 +110,19 @@ EndOfMonthForecast forecastEndOfMonth({
       .fold<double>(0, (a, t) => a + t.amount);
   final avgDaily = last30Spend > 0 ? last30Spend / 30.0 : (dayNumber > 0 ? spent / dayNumber : 0.0);
 
-  // Add upcoming recurring transactions between today and end of month.
-  // These are NOT yet in `txInMonth`, so we add them on top of the run-rate
-  // projection.
+  // Add upcoming recurring transactions strictly AFTER today through end of
+  // month. Anything due on or before today has already been materialised by
+  // `_autoApplyRecurring()` and is therefore already part of `txInMonth`
+  // (counted in `spent`/`income`). Including today here would double-count.
   double upcomingExpense = 0;
   double upcomingIncome = 0;
   if (isCurrent) {
     final eom = DateTime(month.year, month.month, daysInMonth);
     for (final r in recurringRules) {
       if (!r.active) continue;
-      final from = today.subtract(const Duration(days: 1));
+      // dueDatesBetween returns dates strictly > `from`, so passing `today`
+      // gives us only future occurrences.
+      final from = DateTime(today.year, today.month, today.day);
       for (final _ in dueDatesBetween(r, from, eom)) {
         if (r.type == TxType.expense) {
           upcomingExpense += r.amount;
