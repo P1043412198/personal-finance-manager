@@ -990,6 +990,8 @@ class AppState extends ChangeNotifier {
       templates.clear(),
       rates.clear(),
       habitLogs.clear(),
+      pomodoroLogs.clear(),
+      prefs.clear(),
     ]);
     await _seedCategories();
     await _seedRates();

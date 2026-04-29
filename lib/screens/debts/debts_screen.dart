@@ -190,7 +190,7 @@ class _AmortizationHint extends StatelessWidget {
       months = (d.balance / d.minPayment).ceil();
     } else {
       final v = d.minPayment / (d.minPayment - r * d.balance);
-      if (v <= 0) {
+      if (v <= 0 || !v.isFinite) {
         return Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text(

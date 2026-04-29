@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../models/achievement.dart';
 import '../../models/budget.dart';
 import '../../models/category.dart';
 import '../../models/debt.dart';
@@ -107,6 +108,11 @@ class ImportExportScreen extends StatelessWidget {
         'rules': app.rules.all().map((r) => r.toJson()).toList(),
         'templates': app.templates.all().map((t) => t.toJson()).toList(),
         'rates': app.rates.all().map((r) => r.toJson()).toList(),
+        'achievements': app.achievements.all().map((a) => a.toJson()).toList(),
+        'pomodoro_logs': [
+          for (final k in app.pomodoroLogs.keys)
+            {'k': k, 'v': app.pomodoroLogs.get(k as String)}
+        ],
       };
 
   Future<void> _exportJson(BuildContext context, AppState app) async {
@@ -239,6 +245,17 @@ class ImportExportScreen extends StatelessWidget {
         for (final t in j['templates'] as List) {
           await app.templates.put(TxTemplate.fromJson(t as Map));
           imported++;
+        }
+      }
+      if (j['achievements'] is List) {
+        for (final a in j['achievements'] as List) {
+          await app.achievements.put(AchievementModel.fromJson(a as Map));
+          imported++;
+        }
+      }
+      if (j['pomodoro_logs'] is List) {
+        for (final e in j['pomodoro_logs'] as List) {
+          if (e is Map) await app.pomodoroLogs.put(e['k'] as String, e['v']);
         }
       }
       if (context.mounted) {
