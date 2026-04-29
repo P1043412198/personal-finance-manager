@@ -6,6 +6,7 @@ import '../../models/category.dart';
 import '../../models/transaction.dart';
 import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/budget_calc.dart';
 import '../../utils/format.dart';
 import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
@@ -31,6 +32,11 @@ class HomeTab extends StatelessWidget {
     final planned = budget?.totalLimit ?? (income > 0 ? income : (expense * 1.1));
     final remaining = planned - expense;
     final percent = planned > 0 ? (remaining / planned).clamp(0.0, 1.0) : 0.0;
+    final metrics = BudgetMetrics.compute(
+      month: now,
+      txInMonth: monthTx,
+      budget: budget,
+    );
 
     final recent = app.txAll().take(3).toList();
 
@@ -196,6 +202,10 @@ class HomeTab extends StatelessWidget {
                 ],
               ),
             ),
+            if (budget != null) ...[
+              const SizedBox(height: 12),
+              _FreeTodayCard(metrics: metrics),
+            ],
             const SizedBox(height: 18),
             SectionHeader(title: i18n.t('quick_actions')),
             _QuickActions(),
@@ -290,6 +300,97 @@ class HomeTab extends StatelessWidget {
                   const Text('📈', style: TextStyle(fontSize: 22)),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FreeTodayCard extends StatelessWidget {
+  final BudgetMetrics metrics;
+  const _FreeTodayCard({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final i18n = context.watch<I18n>();
+    final negative = metrics.freeFundsFact < 0;
+    final isRu = i18n.lang == AppLang.ru;
+    final dayWord = isRu
+        ? daysWord(
+            n: metrics.daysLeft,
+            one: i18n.t('days_left_one'),
+            few: i18n.t('days_left_few'),
+            many: i18n.t('days_left'),
+          )
+        : (metrics.daysLeft == 1
+            ? i18n.t('days_left_one')
+            : i18n.t('days_left'));
+    final accent = negative ? AppColors.danger : AppColors.income;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => const BudgetTab(asPage: true))),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              accent.withOpacity(0.10),
+              accent.withOpacity(0.04),
+            ],
+          ),
+          border: Border.all(color: accent.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  negative ? Icons.warning_amber_rounded : Icons.savings_outlined,
+                  color: accent,
+                ),
+                const SizedBox(width: 8),
+                Text(i18n.t('free_today'),
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    )),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              Fmt.currency(metrics.freeFundsFact, symbol: app.currency),
+              style: TextStyle(
+                color: accent,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${i18n.t('safe_per_day')}: ${Fmt.currency(metrics.safePerDay, symbol: app.currency)}',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                ),
+                Text(
+                  '${metrics.daysLeft} $dayWord',
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
             ),
           ],
         ),

@@ -32,7 +32,7 @@ class AppTheme {
       fontFamily: 'Roboto',
     );
     return base.copyWith(
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.cardBg,
         elevation: 0,
         margin: EdgeInsets.zero,
@@ -142,7 +142,7 @@ class AppTheme {
     );
     return base.copyWith(
       scaffoldBackgroundColor: const Color(0xFF101410),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF1B201B),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
