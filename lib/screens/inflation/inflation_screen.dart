@@ -43,7 +43,9 @@ class _InflationScreenState extends State<InflationScreen> {
       _InflationPeriod.sixMonth => 6,
       _InflationPeriod.oneYear => 12,
     };
-    final start = DateTime(end.year, end.month - months, end.day);
+    // Use day=1 to avoid DateTime overflow when end.day exceeds the target
+    // month's last day (e.g. Mar 31 - 1 month would normalize to Mar 3).
+    final start = DateTime(end.year, end.month - months, 1);
     return _client.dynamics(cur: cur, startDate: start, endDate: end);
   }
 
