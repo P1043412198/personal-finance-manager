@@ -418,6 +418,7 @@ class AppState extends ChangeNotifier {
     final sp = await SharedPreferences.getInstance();
     await sp.setString('currency', c);
     notifyListeners();
+    _pushHomeWidget();
   }
 
   Future<void> setThemeMode(ThemeMode m) async {
@@ -449,5 +450,6 @@ class AppState extends ChangeNotifier {
     ]);
     await _seedCategories();
     notifyListeners();
+    _pushHomeWidget();
   }
 }
