@@ -5,9 +5,13 @@ import 'package:provider/provider.dart';
 import '../../models/transaction.dart';
 import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/forecast.dart';
 import '../../utils/format.dart';
 import '../../utils/i18n.dart';
+import '../../widgets/sankey_chart.dart';
 import '../../widgets/section.dart';
+import '../forecasts/forecasts_screen.dart';
+import '../inflation/inflation_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -185,7 +189,104 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               )),
             ),
           ),
+          const SizedBox(height: 16),
+          SectionHeader(title: i18n.t('sankey_title')),
+          AppCard(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+            child: SankeyChart(
+              data: buildSankey(
+                txInMonth: app
+                    .txAll()
+                    .where((t) =>
+                        t.date.year == now.year && t.date.month == now.month)
+                    .toList(),
+                labelFor: (id) => id == null
+                    ? '—'
+                    : (app.categoryById(id)?.name ?? '—'),
+                colorFor: (id) =>
+                    app.categoryById(id)?.colorValue ??
+                    AppColors.primary.value,
+              ),
+              centralLabel: i18n.t('budget'),
+              height: 280,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _AnalyticsLink(
+                  icon: Icons.timeline,
+                  title: i18n.t('forecasts'),
+                  subtitle: i18n.t('forecasts_subtitle'),
+                  color: AppColors.primary,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const ForecastsScreen())),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AnalyticsLink(
+                  icon: Icons.trending_up,
+                  title: i18n.t('inflation'),
+                  subtitle: i18n.t('inflation_subtitle'),
+                  color: AppColors.warning,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const InflationScreen())),
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsLink extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+  const _AnalyticsLink({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: AppCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(height: 10),
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 11),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
       ),
     );
   }
