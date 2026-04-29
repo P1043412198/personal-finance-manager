@@ -20,14 +20,39 @@ class RecurringScreen extends StatelessWidget {
     final list = app.recurringAll();
 
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('recurring'))),
+      appBar: AppBar(
+        title: Text(i18n.t('recurring')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.electrical_services_outlined),
+            tooltip: 'ЖКХ пакет',
+            onPressed: () => _addZhkhPreset(context),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _edit(context, null),
         child: const Icon(Icons.add),
       ),
       body: list.isEmpty
-          ? Center(child: Text(i18n.t('no_data'),
-              style: const TextStyle(color: AppColors.textSecondary)))
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(i18n.t('no_data'),
+                        style: const TextStyle(color: AppColors.textSecondary)),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.electrical_services_outlined),
+                      label: const Text('Добавить ЖКХ пакет'),
+                      onPressed: () => _addZhkhPreset(context),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
               children: [
@@ -61,6 +86,34 @@ class RecurringScreen extends StatelessWidget {
                   ),
               ],
             ),
+    );
+  }
+
+  Future<void> _addZhkhPreset(BuildContext context) async {
+    final app = context.read<AppState>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ЖКХ пакет'),
+        content: const Text(
+            'Создать 8 регулярных платежей: вода, газ, свет, отопление, '
+            'интернет, домофон, капремонт.\n\nДата старта — 5-е число следующего месяца, '
+            'способ оплаты — ЕРИП. Суммы можно отредактировать позже.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Добавить')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final n = await app.addZhkhPreset();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Добавлено платежей: $n')),
     );
   }
 

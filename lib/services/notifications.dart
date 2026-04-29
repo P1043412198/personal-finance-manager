@@ -73,6 +73,45 @@ class NotificationService {
     } catch (_) {}
   }
 
+  /// Schedule a daily repeating notification at the given hour/minute (local time).
+  Future<void> scheduleDaily({
+    required int id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+  }) async {
+    await init();
+    try {
+      final now = tz.TZDateTime.now(tz.local);
+      var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+      if (!when.isAfter(now)) {
+        when = when.add(const Duration(days: 1));
+      }
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'main_channel',
+            'Reminders',
+            channelDescription: 'Tasks, habits, budget reminders',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      debugPrint('schedule daily failed: $e');
+    }
+  }
+
   Future<void> showNow({
     required String title,
     required String body,

@@ -262,6 +262,7 @@ class _HabitFormState extends State<_HabitForm> {
   HabitKind _kind = HabitKind.good;
   String _icon = 'sport';
   Color _color = AppColors.primary;
+  int? _reminderMinutes;
 
   @override
   void initState() {
@@ -271,6 +272,7 @@ class _HabitFormState extends State<_HabitForm> {
     _kind = widget.existing?.kind ?? HabitKind.good;
     _icon = widget.existing?.iconKey ?? 'sport';
     _color = widget.existing != null ? Color(widget.existing!.colorValue) : AppColors.primary;
+    _reminderMinutes = widget.existing?.reminderMinutes;
   }
 
   @override
@@ -401,6 +403,42 @@ class _HabitFormState extends State<_HabitForm> {
                 ),
             ],
           ),
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () async {
+              final init = _reminderMinutes;
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay(
+                    hour: init != null ? init ~/ 60 : 9,
+                    minute: init != null ? init % 60 : 0),
+              );
+              if (picked != null) {
+                setState(() =>
+                    _reminderMinutes = picked.hour * 60 + picked.minute);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                  color: AppColors.muted,
+                  borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                const Icon(Icons.alarm, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(_reminderMinutes == null
+                      ? 'Напоминание (не задано)'
+                      : 'Напоминание: ${(_reminderMinutes! ~/ 60).toString().padLeft(2, '0')}:${(_reminderMinutes! % 60).toString().padLeft(2, '0')}'),
+                ),
+                if (_reminderMinutes != null)
+                  GestureDetector(
+                    onTap: () => setState(() => _reminderMinutes = null),
+                    child: const Icon(Icons.close, size: 18),
+                  ),
+              ]),
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -427,6 +465,7 @@ class _HabitFormState extends State<_HabitForm> {
                       iconKey: _icon,
                       colorValue: _color.value,
                       savePerDay: double.tryParse(_save.text.replaceAll(',', '.')) ?? 0,
+                      reminderMinutes: _reminderMinutes,
                       createdAt: widget.existing?.createdAt ?? DateTime.now(),
                     );
                     await app.upsertHabit(h);

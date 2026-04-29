@@ -1,5 +1,15 @@
 enum TaskPriority { low, medium, high }
 
+class Subtask {
+  String title;
+  bool done;
+  Subtask({required this.title, this.done = false});
+
+  Map<String, dynamic> toJson() => {'title': title, 'done': done};
+  factory Subtask.fromJson(Map j) =>
+      Subtask(title: j['title']?.toString() ?? '', done: j['done'] == true);
+}
+
 class TaskModel {
   final String id;
   String title;
@@ -10,6 +20,7 @@ class TaskModel {
   TaskPriority priority;
   DateTime createdAt;
   DateTime? completedAt;
+  List<Subtask> subtasks;
 
   TaskModel({
     required this.id,
@@ -21,7 +32,14 @@ class TaskModel {
     this.priority = TaskPriority.medium,
     required this.createdAt,
     this.completedAt,
-  });
+    List<Subtask>? subtasks,
+  }) : subtasks = subtasks ?? [];
+
+  double get subtaskProgress {
+    if (subtasks.isEmpty) return done ? 1 : 0;
+    final d = subtasks.where((s) => s.done).length;
+    return d / subtasks.length;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -33,6 +51,7 @@ class TaskModel {
         'priority': priority.name,
         'createdAt': createdAt.toIso8601String(),
         'completedAt': completedAt?.toIso8601String(),
+        'subtasks': subtasks.map((s) => s.toJson()).toList(),
       };
 
   factory TaskModel.fromJson(Map j) => TaskModel(
@@ -47,5 +66,10 @@ class TaskModel {
         createdAt: DateTime.parse(j['createdAt'] as String),
         completedAt:
             j['completedAt'] != null ? DateTime.parse(j['completedAt']) : null,
+        subtasks: (j['subtasks'] as List?)
+                ?.whereType<Map>()
+                .map(Subtask.fromJson)
+                .toList() ??
+            [],
       );
 }

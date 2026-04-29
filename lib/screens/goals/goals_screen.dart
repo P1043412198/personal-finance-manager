@@ -108,6 +108,7 @@ class _GoalFormState extends State<_GoalForm> {
   late TextEditingController _name;
   late TextEditingController _target;
   late TextEditingController _current;
+  late TextEditingController _autoDep;
   DateTime? _deadline;
   String _icon = 'savings';
   Color _color = AppColors.primary;
@@ -119,6 +120,8 @@ class _GoalFormState extends State<_GoalForm> {
     _name = TextEditingController(text: e?.name ?? '');
     _target = TextEditingController(text: e == null ? '' : e.target.toStringAsFixed(0));
     _current = TextEditingController(text: e == null ? '' : e.current.toStringAsFixed(0));
+    _autoDep = TextEditingController(
+        text: (e == null || e.autoDepositMonthly == 0) ? '' : e.autoDepositMonthly.toStringAsFixed(0));
     _deadline = e?.deadline;
     _icon = e?.iconKey ?? 'savings';
     _color = e != null ? Color(e.colorValue) : AppColors.primary;
@@ -129,7 +132,19 @@ class _GoalFormState extends State<_GoalForm> {
     _name.dispose();
     _target.dispose();
     _current.dispose();
+    _autoDep.dispose();
     super.dispose();
+  }
+
+  String _suggestText(String currency) {
+    final tgt = double.tryParse(_target.text.replaceAll(',', '.')) ?? 0;
+    final cur = double.tryParse(_current.text.replaceAll(',', '.')) ?? 0;
+    if (tgt <= 0 || _deadline == null) return 'Сколько добавлять каждый месяц';
+    final months = ((_deadline!.year - DateTime.now().year) * 12 +
+            (_deadline!.month - DateTime.now().month))
+        .clamp(1, 999);
+    final suggested = ((tgt - cur).clamp(0, double.infinity)) / months;
+    return 'Чтобы успеть к дедлайну — около ${suggested.toStringAsFixed(0)} $currency / мес';
   }
 
   @override
@@ -193,6 +208,15 @@ class _GoalFormState extends State<_GoalForm> {
             ),
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: _autoDep,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              hintText: 'Авто-копилка / месяц, ${app.currency}',
+              helperText: _suggestText(app.currency),
+            ),
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -244,6 +268,9 @@ class _GoalFormState extends State<_GoalForm> {
                       deadline: _deadline,
                       iconKey: _icon,
                       colorValue: _color.value,
+                      autoDepositMonthly:
+                          double.tryParse(_autoDep.text.replaceAll(',', '.')) ?? 0,
+                      walletId: widget.existing?.walletId,
                       createdAt: widget.existing?.createdAt ?? DateTime.now(),
                     );
                     await app.upsertGoal(g);

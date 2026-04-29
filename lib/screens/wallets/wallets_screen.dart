@@ -22,7 +22,17 @@ class WalletsScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('wallets'))),
+      appBar: AppBar(
+        title: Text(i18n.t('wallets')),
+        actions: [
+          if (list.length >= 2)
+            IconButton(
+              icon: const Icon(Icons.swap_horiz),
+              tooltip: 'Перевод между кошельками',
+              onPressed: () => _transfer(context),
+            ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _edit(context, null),
         child: const Icon(Icons.add),
@@ -142,6 +152,86 @@ class WalletsScreen extends StatelessWidget {
       case WalletType.other:
         return i18n.t('w_other');
     }
+  }
+
+  Future<void> _transfer(BuildContext context) async {
+    final app = context.read<AppState>();
+    final wallets = app.walletAll();
+    if (wallets.length < 2) return;
+    String? fromId = wallets.first.id;
+    String? toId = wallets[1].id;
+    final amountC = TextEditingController();
+    final commentC = TextEditingController();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) {
+        return Padding(
+          padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: ListView(shrinkWrap: true, children: [
+            const Text('Перевод между кошельками',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: fromId,
+              decoration: const InputDecoration(labelText: 'Откуда'),
+              items: [
+                for (final w in wallets)
+                  DropdownMenuItem(
+                      value: w.id,
+                      child: Text(
+                          '${w.name} (${w.balance.toStringAsFixed(2)} ${w.currency})')),
+              ],
+              onChanged: (v) => setS(() => fromId = v),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: toId,
+              decoration: const InputDecoration(labelText: 'Куда'),
+              items: [
+                for (final w in wallets)
+                  DropdownMenuItem(
+                      value: w.id,
+                      child: Text(
+                          '${w.name} (${w.balance.toStringAsFixed(2)} ${w.currency})')),
+              ],
+              onChanged: (v) => setS(() => toId = v),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: amountC,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Сумма'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: commentC,
+              decoration: const InputDecoration(labelText: 'Комментарий (необязательно)'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.check),
+              label: const Text('Перевести'),
+              onPressed: () async {
+                final amt = double.tryParse(amountC.text.replaceAll(',', '.')) ?? 0;
+                if (amt <= 0 || fromId == null || toId == null || fromId == toId) return;
+                await app.transferBetweenWallets(
+                  fromWalletId: fromId!,
+                  toWalletId: toId!,
+                  amount: amt,
+                  comment: commentC.text.trim().isEmpty ? null : commentC.text.trim(),
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+            ),
+          ]),
+        );
+      }),
+    );
   }
 
   Future<void> _edit(BuildContext context, WalletModel? existing) async {

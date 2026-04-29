@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'providers/app_state.dart';
+import 'screens/learn/tax_calc_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/lock/lock_screen.dart';
@@ -114,6 +115,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               GlobalWidgetsLocalizations.delegate,
             ],
             home: _buildHome(app),
+            routes: {
+              '/tax-calc': (_) => const TaxCalcScreen(),
+            },
             builder: (context, child) {
               if (_locked == null) {
                 return const Scaffold(body: SizedBox.shrink());

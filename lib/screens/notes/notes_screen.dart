@@ -194,9 +194,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   late TextEditingController _title;
   late TextEditingController _body;
   late TextEditingController _link;
+  late TextEditingController _newCheck;
   String? _categoryId;
   late List<String> _images;
   late List<String> _links;
+  late List<ChecklistItem> _check;
 
   @override
   void initState() {
@@ -205,9 +207,14 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _title = TextEditingController(text: e?.title ?? '');
     _body = TextEditingController(text: e?.body ?? '');
     _link = TextEditingController();
+    _newCheck = TextEditingController();
     _categoryId = e?.categoryId;
     _images = List.from(e?.imagePaths ?? []);
     _links = List.from(e?.links ?? []);
+    _check = e?.checklist
+            .map((c) => ChecklistItem(text: c.text, done: c.done))
+            .toList() ??
+        <ChecklistItem>[];
   }
 
   @override
@@ -215,6 +222,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _title.dispose();
     _body.dispose();
     _link.dispose();
+    _newCheck.dispose();
     super.dispose();
   }
 
@@ -256,6 +264,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                 categoryId: _categoryId,
                 imagePaths: _images,
                 links: _links,
+                checklist: _check,
                 createdAt: widget.existing?.createdAt ?? DateTime.now(),
                 updatedAt: DateTime.now(),
               );
@@ -343,6 +352,61 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
             icon: const Icon(Icons.image_outlined),
             label: Text(i18n.t('attach_image')),
           ),
+          const SizedBox(height: 16),
+          const Text('Чек-лист',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _check.length; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Checkbox(
+                  value: _check[i].done,
+                  onChanged: (v) => setState(() => _check[i].done = v ?? false),
+                ),
+                Expanded(
+                  child: Text(
+                    _check[i].text,
+                    style: TextStyle(
+                      decoration: _check[i].done ? TextDecoration.lineThrough : null,
+                      color: _check[i].done
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  onPressed: () => setState(() => _check.removeAt(i)),
+                ),
+              ]),
+            ),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _newCheck,
+                decoration: const InputDecoration(
+                    hintText: 'Добавить пункт', isDense: true),
+                onSubmitted: (v) {
+                  if (v.trim().isEmpty) return;
+                  setState(() {
+                    _check.add(ChecklistItem(text: v.trim()));
+                    _newCheck.clear();
+                  });
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: AppColors.primary),
+              onPressed: () {
+                if (_newCheck.text.trim().isEmpty) return;
+                setState(() {
+                  _check.add(ChecklistItem(text: _newCheck.text.trim()));
+                  _newCheck.clear();
+                });
+              },
+            ),
+          ]),
           const SizedBox(height: 12),
           if (_links.isNotEmpty)
             for (int i = 0; i < _links.length; i++)

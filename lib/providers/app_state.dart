@@ -111,6 +111,8 @@ class AppState extends ChangeNotifier {
   /// habit logs: key = habitId_yyyy-MM-dd, value = 1
   final habitLogs = KvStore('habit_logs');
   final prefs = KvStore('prefs');
+  /// pomodoro sessions: key = ISO timestamp, value = duration minutes (int)
+  final pomodoroLogs = KvStore('pomodoro_logs');
 
   String currency = 'Br';
   String userName = '';
@@ -141,6 +143,7 @@ class AppState extends ChangeNotifier {
       rates.open(),
       habitLogs.open(),
       prefs.open(),
+      pomodoroLogs.open(),
     ]);
 
     final sp = await SharedPreferences.getInstance();
@@ -166,10 +169,30 @@ class AppState extends ChangeNotifier {
     }
 
     await runDueRecurring();
+    await applyMonthlyAutoDeposits();
     if (notificationsEnabled) {
       await NotificationService.instance.init();
       await rescheduleAllNotifications();
     }
+  }
+
+  /// Once per calendar month, top up each goal by its `autoDepositMonthly`.
+  /// Tracked via prefs so it runs at most once per month.
+  Future<void> applyMonthlyAutoDeposits() async {
+    final now = DateTime.now();
+    final monthKey = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}';
+    final last = prefs.get('auto_deposit_last') as String?;
+    if (last == monthKey) return;
+    var any = false;
+    for (final g in goals.all()) {
+      if (g.autoDepositMonthly <= 0) continue;
+      if (g.current >= g.target) continue;
+      g.current = (g.current + g.autoDepositMonthly).clamp(0, g.target);
+      await goals.put(g);
+      any = true;
+    }
+    await prefs.put('auto_deposit_last', monthKey);
+    if (any) notifyListeners();
   }
 
   Future<void> _seedCategories() async {
@@ -386,6 +409,99 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Move funds between two wallets. Records two transactions tagged with `transfer:<groupId>`
+  /// so the pair can be hidden from regular income/expense analytics.
+  Future<void> transferBetweenWallets({
+    required String fromWalletId,
+    required String toWalletId,
+    required double amount,
+    String? comment,
+  }) async {
+    if (fromWalletId == toWalletId || amount <= 0) return;
+    final groupId = _uuid.v4();
+    final from = wallets.get(fromWalletId);
+    final to = wallets.get(toWalletId);
+    if (from == null || to == null) return;
+    final out = TransactionModel(
+      id: _uuid.v4(),
+      type: TxType.expense,
+      amount: amount,
+      currency: from.currency,
+      categoryId: null,
+      walletId: fromWalletId,
+      shop: 'Перевод → ${to.name}',
+      comment: 'transfer:$groupId${comment == null || comment.isEmpty ? '' : ' · $comment'}',
+      date: DateTime.now(),
+      method: PayMethod.transfer,
+    );
+    final inn = TransactionModel(
+      id: _uuid.v4(),
+      type: TxType.income,
+      amount: amount,
+      currency: to.currency,
+      categoryId: null,
+      walletId: toWalletId,
+      shop: 'Перевод ← ${from.name}',
+      comment: 'transfer:$groupId${comment == null || comment.isEmpty ? '' : ' · $comment'}',
+      date: DateTime.now(),
+      method: PayMethod.transfer,
+    );
+    await transactions.put(out);
+    await transactions.put(inn);
+    await _bumpWallet(fromWalletId, -amount);
+    await _bumpWallet(toWalletId, amount);
+    notifyListeners();
+  }
+
+  /// Add a Belarus-style ЖКХ preset bundle of recurring monthly bills.
+  /// Returns count added.
+  Future<int> addZhkhPreset({String? walletId, String? categoryId}) async {
+    final cats = categories.all();
+    final utilCat = categoryId ??
+        cats
+            .firstWhere(
+              (c) => c.name.toLowerCase().startsWith('комм'),
+              orElse: () => cats.firstWhere(
+                (c) => c.name.toLowerCase().startsWith('покупки'),
+                orElse: () => cats.first,
+              ),
+            )
+            .id;
+    final now = DateTime.now();
+    final firstOfNext = DateTime(now.month == 12 ? now.year + 1 : now.year,
+        now.month == 12 ? 1 : now.month + 1, 5);
+    final preset = <(String, double)>[
+      ('Холодная вода', 18),
+      ('Горячая вода', 35),
+      ('Газ', 12),
+      ('Электричество', 30),
+      ('Отопление', 60),
+      ('Интернет', 40),
+      ('Домофон', 6),
+      ('Капремонт', 15),
+    ];
+    var added = 0;
+    for (final p in preset) {
+      final r = RecurringTxModel(
+        id: _uuid.v4(),
+        name: p.$1,
+        type: TxType.expense,
+        amount: p.$2,
+        categoryId: utilCat,
+        walletId: walletId,
+        comment: 'ЖКХ',
+        cadence: Cadence.monthly,
+        startDate: firstOfNext,
+        nextRun: firstOfNext,
+        method: PayMethod.erip,
+      );
+      await recurring.put(r);
+      added++;
+    }
+    notifyListeners();
+    return added;
+  }
+
   // --- Recurring
   List<RecurringTxModel> recurringAll() =>
       recurring.all()..sort((a, b) => a.nextRun.compareTo(b.nextRun));
@@ -591,6 +707,7 @@ class AppState extends ChangeNotifier {
   Future<void> upsertHabit(HabitModel h) async {
     await habits.put(h);
     _checkAchievements(triggeredBy: 'habit');
+    await rescheduleAllNotifications();
     notifyListeners();
   }
 
@@ -600,6 +717,7 @@ class AppState extends ChangeNotifier {
     for (final k in keys) {
       await habitLogs.delete(k.toString());
     }
+    await rescheduleAllNotifications();
     notifyListeners();
   }
 
@@ -806,9 +924,54 @@ class AppState extends ChangeNotifier {
         when: r.nextRun,
       );
     }
+    for (final h in habits.all()) {
+      final m = h.reminderMinutes;
+      if (m == null) continue;
+      await NotificationService.instance.scheduleDaily(
+        id: notificationIdFor('habit_${h.id}'),
+        title: 'Привычка: ${h.name}',
+        body: h.kind.name == 'good'
+            ? 'Отметь сегодняшнее выполнение'
+            : 'Не сорваться сегодня — ты сильнее',
+        hour: m ~/ 60,
+        minute: m % 60,
+      );
+    }
   }
 
   void notify() => notifyListeners();
+
+  // --- Pomodoro
+  Future<void> logPomodoroSession(int minutes) async {
+    final ts = DateTime.now().toIso8601String();
+    await pomodoroLogs.put(ts, minutes);
+    notifyListeners();
+  }
+
+  /// Returns map: yyyy-MM-dd -> minutes for last `days` days.
+  Map<String, int> pomodoroDaily(int days) {
+    final out = <String, int>{};
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    for (final k in pomodoroLogs.keys) {
+      try {
+        final dt = DateTime.parse(k.toString());
+        if (dt.isBefore(cutoff)) continue;
+        final dayKey =
+            '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        final mins = (pomodoroLogs.get(k.toString()) as num?)?.toInt() ?? 0;
+        out[dayKey] = (out[dayKey] ?? 0) + mins;
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  int pomodoroTotalMinutes() {
+    var total = 0;
+    for (final k in pomodoroLogs.keys) {
+      total += (pomodoroLogs.get(k.toString()) as num?)?.toInt() ?? 0;
+    }
+    return total;
+  }
 
   Future<void> resetAll() async {
     await Future.wait([

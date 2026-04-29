@@ -8,6 +8,8 @@ class HabitModel {
   String iconKey;
   int colorValue;
   double savePerDay;
+  /// Optional daily reminder time, minutes since midnight (0-1439). Null = off.
+  int? reminderMinutes;
   DateTime createdAt;
 
   HabitModel({
@@ -18,6 +20,7 @@ class HabitModel {
     this.iconKey = 'sport',
     this.colorValue = 0xFF2E7D32,
     this.savePerDay = 0,
+    this.reminderMinutes,
     required this.createdAt,
   });
 
@@ -29,6 +32,7 @@ class HabitModel {
         'iconKey': iconKey,
         'colorValue': colorValue,
         'savePerDay': savePerDay,
+        'reminderMinutes': reminderMinutes,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -41,6 +45,7 @@ class HabitModel {
         iconKey: j['iconKey'] as String? ?? 'sport',
         colorValue: (j['colorValue'] as num?)?.toInt() ?? 0xFF2E7D32,
         savePerDay: (j['savePerDay'] as num?)?.toDouble() ?? 0,
+        reminderMinutes: (j['reminderMinutes'] as num?)?.toInt(),
         createdAt: DateTime.parse(j['createdAt']),
       );
 }

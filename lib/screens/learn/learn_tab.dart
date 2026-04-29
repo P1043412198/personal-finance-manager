@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/lessons.dart';
+import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
+import 'lesson_screen.dart';
 
 class LearnTab extends StatelessWidget {
   const LearnTab({super.key});
@@ -11,16 +14,20 @@ class LearnTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final i18n = context.watch<I18n>();
-    final lessons = [
-      ('🌱', 'Зачем нужен бюджет', '5 мин', 'Базы личных финансов: куда уходят деньги.'),
-      ('💼', 'Подушка безопасности', '7 мин', 'Сколько копить и как защититься от форс-мажоров.'),
-      ('💳', 'Кредиты без боли', '8 мин', 'Снежок vs лавина — как быстрее закрыть долги.'),
-      ('🎯', 'Sinking funds', '6 мин', 'Конверты на крупные траты заранее.'),
-      ('📊', '50/30/20', '4 мин', 'Простая формула распределения дохода.'),
-      ('🏦', 'Инвестиции 101', '10 мин', 'С чего начать без риска впасть в стресс.'),
-    ];
+    final app = context.watch<AppState>();
+    final readSet = (app.prefs.get('learn_read') as String?)?.split(',').toSet() ?? <String>{};
+    final progress = lessonsRu.isEmpty ? 0.0 : readSet.length / lessonsRu.length;
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('learn'))),
+      appBar: AppBar(
+        title: Text(i18n.t('learn')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: 'Калькулятор зарплаты РБ',
+            onPressed: () => Navigator.of(context).pushNamed('/tax-calc'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
         children: [
@@ -35,11 +42,23 @@ class LearnTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(i18n.t('learn'),
+                      Text('Финансовая грамотность',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 4),
-                      Text(i18n.t('small_steps'),
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      Text(
+                        'Прочитано ${readSet.length} из ${lessonsRu.length}',
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          backgroundColor: Colors.white,
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -47,31 +66,31 @@ class LearnTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          SectionHeader(title: i18n.t('learn')),
-          for (final l in lessons)
+          AppCard(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              leading: const Text('🧮', style: TextStyle(fontSize: 28)),
+              title: const Text('Калькулятор зарплаты РБ'),
+              subtitle: const Text('Подоходный 13% + ФСЗН 1% — грязная ↔ чистая'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).pushNamed('/tax-calc'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: 'Уроки'),
+          for (final l in lessonsRu)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: AppCard(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    showDragHandle: true,
-                    builder: (_) => Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${l.$1} ${l.$2}',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 8),
-                          Text(l.$4,
-                              style: const TextStyle(color: AppColors.textSecondary, height: 1.4)),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  );
+                onTap: () async {
+                  await Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => LessonScreen(lesson: l),
+                  ));
+                  final updated = (app.prefs.get('learn_read') as String?)?.split(',').toSet() ??
+                      <String>{};
+                  updated.add(l.id);
+                  await app.prefs.put('learn_read', updated.join(','));
+                  app.notify();
                 },
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -84,18 +103,36 @@ class LearnTab extends StatelessWidget {
                         color: AppColors.muted,
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Text(l.$1, style: const TextStyle(fontSize: 24)),
+                      child: Text(l.emoji, style: const TextStyle(fontSize: 24)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(l.$2, style: const TextStyle(fontWeight: FontWeight.w700)),
+                          Row(children: [
+                            Expanded(
+                              child: Text(l.title,
+                                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                            ),
+                            if (readSet.contains(l.id))
+                              const Icon(Icons.check_circle,
+                                  color: AppColors.income, size: 18),
+                          ]),
                           const SizedBox(height: 2),
-                          Text(l.$3,
+                          Text(l.summary,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   color: AppColors.textSecondary, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            _Tag(text: l.tag),
+                            const SizedBox(width: 6),
+                            Text(l.readMin,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary, fontSize: 11)),
+                          ]),
                         ],
                       ),
                     ),
@@ -106,6 +143,24 @@ class LearnTab extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String text;
+  const _Tag({required this.text});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(text,
+          style: const TextStyle(
+              color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.w600)),
     );
   }
 }

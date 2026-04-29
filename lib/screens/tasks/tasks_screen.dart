@@ -143,12 +143,27 @@ class _TaskRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(task.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      decoration: task.done ? TextDecoration.lineThrough : null,
-                      color: task.done ? AppColors.textSecondary : AppColors.textPrimary,
-                    )),
+                Row(children: [
+                  Expanded(
+                    child: Text(task.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          decoration: task.done ? TextDecoration.lineThrough : null,
+                          color: task.done ? AppColors.textSecondary : AppColors.textPrimary,
+                        )),
+                  ),
+                  if (task.subtasks.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        '${task.subtasks.where((s) => s.done).length}/${task.subtasks.length}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ]),
                 if (cat != null || task.dueDate != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -200,9 +215,11 @@ class _TaskForm extends StatefulWidget {
 class _TaskFormState extends State<_TaskForm> {
   late TextEditingController _title;
   late TextEditingController _desc;
+  late TextEditingController _newSub;
   String? _categoryId;
   DateTime? _dueDate;
   TaskPriority _priority = TaskPriority.medium;
+  late List<Subtask> _subtasks;
 
   @override
   void initState() {
@@ -210,15 +227,21 @@ class _TaskFormState extends State<_TaskForm> {
     final e = widget.existing;
     _title = TextEditingController(text: e?.title ?? '');
     _desc = TextEditingController(text: e?.description ?? '');
+    _newSub = TextEditingController();
     _categoryId = e?.categoryId;
     _dueDate = e?.dueDate;
     _priority = e?.priority ?? TaskPriority.medium;
+    _subtasks = e?.subtasks
+            .map((s) => Subtask(title: s.title, done: s.done))
+            .toList() ??
+        <Subtask>[];
   }
 
   @override
   void dispose() {
     _title.dispose();
     _desc.dispose();
+    _newSub.dispose();
     super.dispose();
   }
 
@@ -321,6 +344,66 @@ class _TaskFormState extends State<_TaskForm> {
             ],
           ),
           const SizedBox(height: 16),
+          const Text('Подзадачи',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _subtasks.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(children: [
+                Checkbox(
+                  value: _subtasks[i].done,
+                  onChanged: (v) =>
+                      setState(() => _subtasks[i].done = v ?? false),
+                ),
+                Expanded(
+                  child: Text(
+                    _subtasks[i].title,
+                    style: TextStyle(
+                      decoration: _subtasks[i].done
+                          ? TextDecoration.lineThrough
+                          : null,
+                      color: _subtasks[i].done
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  onPressed: () =>
+                      setState(() => _subtasks.removeAt(i)),
+                ),
+              ]),
+            ),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _newSub,
+                decoration: const InputDecoration(
+                    hintText: 'Добавить подзадачу',
+                    isDense: true),
+                onSubmitted: (v) {
+                  if (v.trim().isEmpty) return;
+                  setState(() {
+                    _subtasks.add(Subtask(title: v.trim()));
+                    _newSub.clear();
+                  });
+                },
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: AppColors.primary),
+              onPressed: () {
+                if (_newSub.text.trim().isEmpty) return;
+                setState(() {
+                  _subtasks.add(Subtask(title: _newSub.text.trim()));
+                  _newSub.clear();
+                });
+              },
+            ),
+          ]),
+          const SizedBox(height: 16),
           Row(
             children: [
               if (widget.existing != null)
@@ -347,6 +430,7 @@ class _TaskFormState extends State<_TaskForm> {
                       dueDate: _dueDate,
                       done: widget.existing?.done ?? false,
                       priority: _priority,
+                      subtasks: _subtasks,
                       createdAt: widget.existing?.createdAt ?? DateTime.now(),
                       completedAt: widget.existing?.completedAt,
                     );
