@@ -165,13 +165,13 @@ class _NoteCard extends StatelessWidget {
             for (final l in note.links.take(2))
               Row(
                 children: [
-                  const Icon(Icons.link, size: 14, color: AppColors.primary),
+                  Icon(Icons.link, size: 14, color: AppColors.primary),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(l,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.primary, fontSize: 12)),
+                        style: TextStyle(color: AppColors.primary, fontSize: 12)),
                   ),
                 ],
               ),
@@ -347,14 +347,14 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           if (_links.isNotEmpty)
             for (int i = 0; i < _links.length; i++)
               ListTile(
-                leading: const Icon(Icons.link, color: AppColors.primary),
+                leading: Icon(Icons.link, color: AppColors.primary),
                 title: GestureDetector(
                   onTap: () async {
                     final uri = Uri.tryParse(_links[i]);
                     if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
                   },
                   child: Text(_links[i],
-                      style: const TextStyle(color: AppColors.primary), overflow: TextOverflow.ellipsis),
+                      style: TextStyle(color: AppColors.primary), overflow: TextOverflow.ellipsis),
                 ),
                 trailing: IconButton(
                     icon: const Icon(Icons.close),

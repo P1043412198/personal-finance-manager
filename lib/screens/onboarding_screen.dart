@@ -82,7 +82,7 @@ class OnboardingScreen extends StatelessWidget {
                         TextSpan(text: '${i18n.t('have_account')} '),
                         TextSpan(
                           text: i18n.t('sign_in'),
-                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),

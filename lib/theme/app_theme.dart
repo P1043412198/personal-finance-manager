@@ -1,31 +1,50 @@
 import 'package:flutter/material.dart';
 
+import 'palettes.dart';
+
 class AppColors {
-  static const primary = Color(0xFF2E7D32);
-  static const primaryLight = Color(0xFF60AD5E);
-  static const primaryDark = Color(0xFF005005);
-  static const accent = Color(0xFF66BB6A);
-  static const surface = Color(0xFFFFFFFF);
-  static const background = Color(0xFFF7F8F7);
-  static const cardBg = Color(0xFFFFFFFF);
-  static const muted = Color(0xFFEFF3EE);
-  static const textPrimary = Color(0xFF1B1F1B);
-  static const textSecondary = Color(0xFF6C7470);
-  static const danger = Color(0xFFD32F2F);
-  static const warning = Color(0xFFF9A825);
-  static const info = Color(0xFF1976D2);
-  static const expense = Color(0xFFE53935);
-  static const income = Color(0xFF2E7D32);
+  /// Mutable accent colors. Updated when the user picks a new palette via
+  /// [applyPalette]. Custom widgets that reference these will repaint after
+  /// AppState rebuilds (palette change triggers notifyListeners + the root
+  /// MaterialApp rebuilds with a new key).
+  static Color primary = const Color(0xFF2E7D32);
+  static Color accent = const Color(0xFF66BB6A);
+  static Color income = const Color(0xFF2E7D32);
+  static Color expense = const Color(0xFFE53935);
+  static Color warning = const Color(0xFFF9A825);
+  static Color danger = const Color(0xFFD32F2F);
+
+  /// Static neutral colors that don't change with the palette.
+  static const Color primaryLight = Color(0xFF60AD5E);
+  static const Color primaryDark = Color(0xFF005005);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color background = Color(0xFFF7F8F7);
+  static const Color cardBg = Color(0xFFFFFFFF);
+  static const Color muted = Color(0xFFEFF3EE);
+  static const Color textPrimary = Color(0xFF1B1F1B);
+  static const Color textSecondary = Color(0xFF6C7470);
+  static const Color info = Color(0xFF1976D2);
+
+  static void applyPalette(AppPalette p) {
+    final spec = paletteSpec(p);
+    primary = spec.seed;
+    accent = spec.accent;
+    income = spec.income;
+    expense = spec.expense;
+    warning = spec.warning;
+    danger = spec.danger;
+  }
 }
 
 class AppTheme {
-  static ThemeData light() {
+  static ThemeData light({AppPalette palette = AppPalette.forest}) {
+    final spec = paletteSpec(palette);
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
+        seedColor: spec.seed,
         brightness: Brightness.light,
-        primary: AppColors.primary,
+        primary: spec.seed,
         surface: AppColors.surface,
       ),
       scaffoldBackgroundColor: AppColors.background,
@@ -52,7 +71,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: spec.seed,
           foregroundColor: Colors.white,
           elevation: 0,
           minimumSize: const Size(double.infinity, 52),
@@ -62,16 +81,16 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: spec.seed,
           minimumSize: const Size(double.infinity, 52),
-          side: const BorderSide(color: AppColors.primary, width: 1.4),
+          side: BorderSide(color: spec.seed, width: 1.4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: spec.seed,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -90,23 +109,23 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+          borderSide: BorderSide(color: spec.seed, width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: const TextStyle(color: AppColors.textSecondary),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.muted,
-        selectedColor: AppColors.primary,
+        selectedColor: spec.seed,
         labelStyle: const TextStyle(color: AppColors.textPrimary),
         secondaryLabelStyle: const TextStyle(color: Colors.white),
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       dividerTheme: const DividerThemeData(color: Color(0xFFEFEFEF), thickness: 1),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
+        selectedItemColor: spec.seed,
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
@@ -121,8 +140,8 @@ class AppTheme {
           const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         ),
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: spec.seed,
         foregroundColor: Colors.white,
       ),
       textTheme: base.textTheme.apply(
@@ -132,11 +151,12 @@ class AppTheme {
     );
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({AppPalette palette = AppPalette.forest}) {
+    final spec = paletteSpec(palette);
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
+        seedColor: spec.seed,
         brightness: Brightness.dark,
       ),
     );
@@ -154,7 +174,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: spec.seed,
           foregroundColor: Colors.white,
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

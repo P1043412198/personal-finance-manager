@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/palettes.dart';
 import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
 import '../analytics/analytics_screen.dart';
@@ -62,7 +63,7 @@ class ProfileTab extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: () => _editName(context, app, i18n),
-                  icon: const Icon(Icons.edit, color: AppColors.primary),
+                  icon: Icon(Icons.edit, color: AppColors.primary),
                 ),
               ],
             ),
@@ -160,6 +161,26 @@ class ProfileTab extends StatelessWidget {
                             : i18n.t('theme_dark')),
                     activeColor: AppColors.primary,
                     contentPadding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(title: i18n.t('palette')),
+          AppCard(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final p in AppPalette.values)
+                  _PaletteSwatch(
+                    palette: p,
+                    selected: app.palette == p,
+                    onTap: () => app.setPalette(p),
+                    label: i18n.locale.languageCode == 'ru'
+                        ? paletteSpec(p).labelRu
+                        : paletteSpec(p).labelEn,
                   ),
               ],
             ),
@@ -289,6 +310,72 @@ class _Tile extends StatelessWidget {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
       trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
       onTap: onTap,
+    );
+  }
+}
+
+class _PaletteSwatch extends StatelessWidget {
+  final AppPalette palette;
+  final bool selected;
+  final VoidCallback onTap;
+  final String label;
+  const _PaletteSwatch({
+    required this.palette,
+    required this.selected,
+    required this.onTap,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final spec = paletteSpec(palette);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 84,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.muted.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? spec.seed : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _Dot(color: spec.seed),
+                const SizedBox(width: 4),
+                _Dot(color: spec.accent),
+                const SizedBox(width: 4),
+                _Dot(color: spec.income),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(label,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final Color color;
+  const _Dot({required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

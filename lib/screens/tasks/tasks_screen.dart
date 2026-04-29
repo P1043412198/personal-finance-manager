@@ -56,7 +56,7 @@ class _TasksScreenState extends State<TasksScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     const Spacer(),
                     Text('${(progress * 100).round()}%',
-                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
                   ],
                 ),
                 const SizedBox(height: 8),

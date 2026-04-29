@@ -122,14 +122,14 @@ class HomeTab extends StatelessWidget {
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                             const SizedBox(height: 4),
                             Text(Fmt.currency(income, symbol: app.currency),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.income)),
                             const SizedBox(height: 12),
                             Text(i18n.t('expenses'),
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                             const SizedBox(height: 4),
                             Text(Fmt.currency(expense, symbol: app.currency),
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.expense)),
                           ],
                         ),
@@ -179,7 +179,7 @@ class HomeTab extends StatelessWidget {
                   Row(
                     children: [
                       Text('${(percent * 100).round()}% ${i18n.t('on_plan')}',
-                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
                       const Spacer(),
                       Text(
                         '${i18n.t('plan')}: ${Fmt.currency(planned, symbol: app.currency)}',
