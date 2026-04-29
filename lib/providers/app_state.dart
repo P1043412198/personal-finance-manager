@@ -631,17 +631,18 @@ class AppState extends ChangeNotifier {
 
   int habitStreak(String habitId) {
     final days = habitDays(habitId).toSet();
-    int streak = 0;
+    String dayKey(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     var cursor = DateTime.now();
-    while (true) {
-      final key =
-          '${cursor.year.toString().padLeft(4, '0')}-${cursor.month.toString().padLeft(2, '0')}-${cursor.day.toString().padLeft(2, '0')}';
-      if (days.contains(key)) {
-        streak += 1;
-        cursor = cursor.subtract(const Duration(days: 1));
-      } else {
-        break;
-      }
+    // If today is not yet marked, start counting from yesterday so the streak
+    // doesn't disappear before the user logs today's habit.
+    if (!days.contains(dayKey(cursor))) {
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    int streak = 0;
+    while (days.contains(dayKey(cursor))) {
+      streak += 1;
+      cursor = cursor.subtract(const Duration(days: 1));
     }
     return streak;
   }

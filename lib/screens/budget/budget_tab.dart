@@ -561,11 +561,12 @@ class _CategoryBar extends StatelessWidget {
     final i18n = context.watch<I18n>();
     final cat = app.categoryById(categoryId);
     final emoji = cat != null ? CategoryIcons.resolve(cat.iconKey) : '📦';
-    final pct = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
+    final rawPct = limit > 0 ? spent / limit : 0.0;
+    final pct = rawPct.clamp(0.0, 1.0);
     final left = (limit - spent);
-    final color = pct > 1.0
+    final color = spent > limit
         ? AppColors.danger
-        : pct > 0.8
+        : rawPct > 0.8
             ? AppColors.warning
             : (cat?.color ?? AppColors.primary);
     return Padding(
