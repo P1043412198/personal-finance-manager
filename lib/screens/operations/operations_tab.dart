@@ -405,8 +405,18 @@ class _TxRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(t.shop?.isNotEmpty == true ? t.shop! : (cat?.name ?? '—'),
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Row(children: [
+                    Flexible(
+                      child: Text(t.shop?.isNotEmpty == true ? t.shop! : (cat?.name ?? '—'),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    ),
+                    if ((t.attachmentPath ?? '').isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.receipt_long,
+                          size: 14, color: AppColors.textSecondary),
+                    ],
+                  ]),
                   const SizedBox(height: 2),
                   Text(cat?.name ?? '',
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),

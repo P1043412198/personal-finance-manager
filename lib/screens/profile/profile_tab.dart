@@ -12,6 +12,7 @@ import '../debts/debts_screen.dart';
 import '../goals/goals_screen.dart';
 import '../habits/habits_screen.dart';
 import '../insights/insights_screen.dart';
+import '../receipts/receipts_screen.dart';
 import '../notes/notes_screen.dart';
 import '../pomodoro/pomodoro_screen.dart';
 import '../recurring/recurring_screen.dart';
@@ -96,6 +97,9 @@ class ProfileTab extends StatelessWidget {
               _Tile(icon: '💱', title: i18n.t('currency_rates'),
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const CurrencyRatesScreen()))),
+              _Tile(icon: '🧾', title: 'Чеки',
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ReceiptsScreen()))),
               _Tile(icon: '🔮', title: 'Аналитика и прогноз',
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const InsightsScreen()))),

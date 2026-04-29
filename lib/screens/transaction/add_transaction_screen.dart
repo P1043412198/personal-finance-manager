@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/category.dart';
@@ -10,10 +14,24 @@ import '../../utils/calc.dart';
 import '../../utils/format.dart';
 import '../../utils/i18n.dart';
 
+class TransactionPrefill {
+  final double? amount;
+  final String? shop;
+  final DateTime? date;
+  final String? attachmentPath;
+  const TransactionPrefill({this.amount, this.shop, this.date, this.attachmentPath});
+}
+
 class AddTransactionScreen extends StatefulWidget {
   final TxType initialType;
   final TransactionModel? existing;
-  const AddTransactionScreen({super.key, this.initialType = TxType.expense, this.existing});
+  final TransactionPrefill? prefill;
+  const AddTransactionScreen({
+    super.key,
+    this.initialType = TxType.expense,
+    this.existing,
+    this.prefill,
+  });
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -28,19 +46,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   DateTime _date = DateTime.now();
   PayMethod _method = PayMethod.card;
   bool _saveReceipt = true;
+  String? _attachmentPath;
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
+    final pre = widget.prefill;
     _type = e?.type ?? widget.initialType;
-    _amountCtrl = TextEditingController(text: e == null ? '' : e.amount.toStringAsFixed(0));
-    _shopCtrl = TextEditingController(text: e?.shop ?? '');
+    final initialAmount = e?.amount ?? pre?.amount;
+    _amountCtrl = TextEditingController(
+        text: initialAmount == null ? '' : initialAmount.toStringAsFixed(initialAmount.truncateToDouble() == initialAmount ? 0 : 2));
+    _shopCtrl = TextEditingController(text: e?.shop ?? pre?.shop ?? '');
     _commentCtrl = TextEditingController(text: e?.comment ?? '');
     _categoryId = e?.categoryId;
-    _date = e?.date ?? DateTime.now();
+    _date = e?.date ?? pre?.date ?? DateTime.now();
     _method = e?.method ?? PayMethod.card;
-    _saveReceipt = e?.savedReceipt ?? true;
+    _saveReceipt = e?.savedReceipt ?? (pre?.attachmentPath != null);
+    _attachmentPath = e?.attachmentPath ?? pre?.attachmentPath;
   }
 
   @override
@@ -49,6 +72,39 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _shopCtrl.dispose();
     _commentCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _attachReceipt() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera),
+            title: const Text('Сфотографировать'),
+            onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Из галереи'),
+            onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+          ),
+        ]),
+      ),
+    );
+    if (source == null) return;
+    final x = await ImagePicker().pickImage(source: source, imageQuality: 88, maxWidth: 2200);
+    if (x == null) return;
+    final dir = await getApplicationDocumentsDirectory();
+    final receiptsDir = Directory('${dir.path}/receipts');
+    if (!await receiptsDir.exists()) await receiptsDir.create(recursive: true);
+    final dest = File('${receiptsDir.path}/r_${DateTime.now().millisecondsSinceEpoch}.jpg');
+    await File(x.path).copy(dest.path);
+    if (!mounted) return;
+    setState(() {
+      _attachmentPath = dest.path;
+      _saveReceipt = true;
+    });
   }
 
   Future<void> _save() async {
@@ -65,7 +121,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
       date: _date,
       method: _method,
-      savedReceipt: _saveReceipt,
+      savedReceipt: _saveReceipt || _attachmentPath != null,
+      attachmentPath: _attachmentPath,
     );
     await app.upsertTransaction(tx);
     if (!mounted) return;
@@ -262,11 +319,45 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.qr_code_scanner_outlined),
-              label: Text(i18n.t('scan_or_upload')),
-            ),
+            if (_attachmentPath != null) ...[
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => Scaffold(
+                    appBar: AppBar(title: const Text('Чек')),
+                    body: InteractiveViewer(
+                      child: Center(child: Image.file(File(_attachmentPath!))),
+                    ),
+                  ),
+                )),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(children: [
+                    Image.file(File(_attachmentPath!),
+                        height: 180, width: double.infinity, fit: BoxFit.cover),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton.filledTonal(
+                        onPressed: () => setState(() => _attachmentPath = null),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _attachReceipt,
+                  icon: const Icon(Icons.qr_code_scanner_outlined),
+                  label: Text(_attachmentPath == null
+                      ? i18n.t('scan_or_upload')
+                      : 'Заменить фото'),
+                ),
+              ),
+            ]),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _save, child: Text(i18n.t('save'))),
           ],
