@@ -118,7 +118,7 @@ class _InflationScreenState extends State<InflationScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.cloud_off,
+                            Icon(Icons.cloud_off,
                                 size: 32, color: AppColors.danger),
                             const SizedBox(height: 8),
                             Text(i18n.t('inflation_error'),

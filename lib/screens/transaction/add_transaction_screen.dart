@@ -7,6 +7,7 @@ import '../../providers/app_state.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/format.dart';
 import '../../utils/i18n.dart';
+import '../../widgets/section.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   final TxType initialType;
@@ -105,6 +106,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           children: [
             _TypeToggle(type: _type, onChanged: (v) => setState(() => _type = v)),
             const SizedBox(height: 20),
+            if (widget.existing != null && selectedCat.id.isNotEmpty)
+              Center(
+                child: IconBadge(
+                  emoji: CategoryIcons.resolve(selectedCat.iconKey),
+                  bg: Color(selectedCat.colorValue).withOpacity(0.18),
+                  size: 64,
+                  heroTag: 'tx_icon_${widget.existing!.id}',
+                ),
+              ),
+            if (widget.existing != null && selectedCat.id.isNotEmpty)
+              const SizedBox(height: 12),
             // Amount
             TextField(
               controller: _amountCtrl,

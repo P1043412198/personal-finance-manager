@@ -7,32 +7,72 @@ import '../../theme/app_theme.dart';
 import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
 
-class CategoriesScreen extends StatelessWidget {
+class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
+
+  @override
+  State<CategoriesScreen> createState() => _CategoriesScreenState();
+}
+
+class _CategoriesScreenState extends State<CategoriesScreen> {
+  String _scope = 'tx';
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final i18n = context.watch<I18n>();
-    final cats = app.categories.all();
+    final cats = app.categoriesByScope(_scope);
     return Scaffold(
-      appBar: AppBar(title: Text(i18n.t('categories'))),
+      appBar: AppBar(
+        title: Text(i18n.t('categories')),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final s in const ['tx', 'task', 'habit', 'note'])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(s),
+                        selected: _scope == s,
+                        onSelected: (_) => setState(() => _scope = s),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _edit(context, null),
         child: const Icon(Icons.add),
       ),
-      body: ListView(
+      body: ReorderableListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+        buildDefaultDragHandles: true,
+        onReorder: (oldIndex, newIndex) =>
+            app.reorderCategories(_scope, oldIndex, newIndex),
         children: [
           for (final c in cats)
             Padding(
+              key: ValueKey('cat_${c.id}'),
               padding: const EdgeInsets.only(bottom: 8),
               child: AppCard(
                 padding: const EdgeInsets.all(12),
                 onTap: () => _edit(context, c),
                 child: Row(
                   children: [
-                    IconBadge(emoji: CategoryIcons.resolve(c.iconKey), bg: c.color.withOpacity(0.15)),
+                    IconBadge(
+                      emoji: CategoryIcons.resolve(c.iconKey),
+                      bg: c.color.withOpacity(0.15),
+                      heroTag: 'cat_icon_${c.id}',
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -45,6 +85,8 @@ class CategoriesScreen extends StatelessWidget {
                       ),
                     ),
                     Container(width: 12, height: 12, decoration: BoxDecoration(color: c.color, shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Icon(Icons.drag_handle, color: AppColors.textSecondary, size: 18),
                   ],
                 ),
               ),
@@ -212,6 +254,7 @@ class _CategoryFormState extends State<_CategoryForm> {
                       colorValue: _color.value,
                       iconKey: _icon,
                       scopes: _scopes,
+                      sortIndex: widget.existing?.sortIndex ?? 0,
                     );
                     await app.upsertCategory(c);
                     if (!mounted) return;

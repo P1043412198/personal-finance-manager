@@ -12,6 +12,9 @@ import '../models/snapshot.dart';
 import '../models/task.dart';
 import '../models/transaction.dart';
 import '../repos/store.dart';
+import '../theme/app_theme.dart';
+import '../theme/palettes.dart';
+import '../utils/home_widget_service.dart';
 
 class AppState extends ChangeNotifier {
   final _uuid = const Uuid();
@@ -72,6 +75,7 @@ class AppState extends ChangeNotifier {
   String currency = '₽';
   String userName = '';
   ThemeMode themeMode = ThemeMode.system;
+  AppPalette palette = AppPalette.forest;
   bool onboardingDone = false;
 
   Future<void> init() async {
@@ -95,11 +99,15 @@ class AppState extends ChangeNotifier {
     currency = sp.getString('currency') ?? '₽';
     final tmIdx = sp.getInt('theme_mode') ?? 0;
     themeMode = ThemeMode.values[tmIdx.clamp(0, ThemeMode.values.length - 1)];
+    final palIdx = sp.getInt('palette') ?? 0;
+    palette = AppPalette.values[palIdx.clamp(0, AppPalette.values.length - 1)];
+    AppColors.applyPalette(palette);
 
     if (categories.all().isEmpty) {
       await _seedCategories();
     }
     await _captureMissingSnapshots();
+    await _pushHomeWidget();
   }
 
   /// Walk the past 12 months and ensure each non-current month has a stored
@@ -176,8 +184,17 @@ class AppState extends ChangeNotifier {
   String newId() => _uuid.v4();
 
   // --- Categories
-  List<CategoryModel> categoriesByScope(String scope) =>
-      categories.all().where((c) => c.scopes.contains(scope)).toList();
+  List<CategoryModel> categoriesByScope(String scope) {
+    final list = categories.all().where((c) => c.scopes.contains(scope)).toList();
+    list.sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
+    return list;
+  }
+
+  List<CategoryModel> categoriesAllSorted() {
+    final list = categories.all();
+    list.sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
+    return list;
+  }
 
   CategoryModel? categoryById(String? id) {
     if (id == null) return null;
@@ -194,6 +211,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reorder categories within a scope. [oldIndex] and [newIndex] are indices
+  /// into [categoriesByScope(scope)]. Persists the new order via sortIndex.
+  Future<void> reorderCategories(String scope, int oldIndex, int newIndex) async {
+    final list = categoriesByScope(scope);
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex < 0 || oldIndex >= list.length) return;
+    if (newIndex < 0 || newIndex >= list.length) return;
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    for (var i = 0; i < list.length; i++) {
+      list[i].sortIndex = i;
+      await categories.put(list[i]);
+    }
+    notifyListeners();
+  }
+
   // --- Transactions
   List<TransactionModel> txAll() => transactions.all()
     ..sort((a, b) => b.date.compareTo(a.date));
@@ -205,11 +238,17 @@ class AppState extends ChangeNotifier {
   Future<void> upsertTransaction(TransactionModel t) async {
     await transactions.put(t);
     notifyListeners();
+    _pushHomeWidget();
   }
 
   Future<void> deleteTransaction(String id) async {
     await transactions.delete(id);
     notifyListeners();
+    _pushHomeWidget();
+  }
+
+  Future<void> _pushHomeWidget() async {
+    await HomeWidgetService.push(transactions.all(), currency: currency);
   }
 
   // --- Tasks
@@ -314,8 +353,15 @@ class AppState extends ChangeNotifier {
   }
 
   // --- Goals
-  List<GoalModel> goalAll() =>
-      goals.all()..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  List<GoalModel> goalAll() {
+    final list = goals.all();
+    list.sort((a, b) {
+      final s = a.sortIndex.compareTo(b.sortIndex);
+      if (s != 0) return s;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+    return list;
+  }
 
   Future<void> upsertGoal(GoalModel g) async {
     await goals.put(g);
@@ -324,6 +370,20 @@ class AppState extends ChangeNotifier {
 
   Future<void> deleteGoal(String id) async {
     await goals.delete(id);
+    notifyListeners();
+  }
+
+  Future<void> reorderGoals(int oldIndex, int newIndex) async {
+    final list = goalAll();
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex < 0 || oldIndex >= list.length) return;
+    if (newIndex < 0 || newIndex >= list.length) return;
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    for (var i = 0; i < list.length; i++) {
+      list[i].sortIndex = i;
+      await goals.put(list[i]);
+    }
     notifyListeners();
   }
 
@@ -364,6 +424,14 @@ class AppState extends ChangeNotifier {
     themeMode = m;
     final sp = await SharedPreferences.getInstance();
     await sp.setInt('theme_mode', m.index);
+    notifyListeners();
+  }
+
+  Future<void> setPalette(AppPalette p) async {
+    palette = p;
+    AppColors.applyPalette(p);
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('palette', p.index);
     notifyListeners();
   }
 

@@ -22,7 +22,7 @@ class SectionHeader extends StatelessWidget {
             GestureDetector(
               onTap: onAction,
               child: Text(action!,
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
         ],
       ),
@@ -64,11 +64,19 @@ class IconBadge extends StatelessWidget {
   final String emoji;
   final Color? bg;
   final double size;
-  const IconBadge({super.key, required this.emoji, this.bg, this.size = 40});
+  /// Optional Hero tag — if provided, the badge will fly between routes.
+  final Object? heroTag;
+  const IconBadge({
+    super.key,
+    required this.emoji,
+    this.bg,
+    this.size = 40,
+    this.heroTag,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final box = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -77,6 +85,15 @@ class IconBadge extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(emoji, style: TextStyle(fontSize: size * 0.55)),
+    );
+    if (heroTag == null) return box;
+    return Hero(
+      tag: heroTag!,
+      flightShuttleBuilder: (_, __, ___, ____, _____) => Material(
+        color: Colors.transparent,
+        child: box,
+      ),
+      child: box,
     );
   }
 }

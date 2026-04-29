@@ -38,27 +38,27 @@ class _HomeShellState extends State<HomeShell> {
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home, color: AppColors.primary),
+            selectedIcon: Icon(Icons.home, color: AppColors.primary),
             label: i18n.t('home'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.list_alt_outlined),
-            selectedIcon: const Icon(Icons.list_alt, color: AppColors.primary),
+            selectedIcon: Icon(Icons.list_alt, color: AppColors.primary),
             label: i18n.t('operations'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: const Icon(Icons.account_balance_wallet, color: AppColors.primary),
+            selectedIcon: Icon(Icons.account_balance_wallet, color: AppColors.primary),
             label: i18n.t('budget'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.menu_book_outlined),
-            selectedIcon: const Icon(Icons.menu_book, color: AppColors.primary),
+            selectedIcon: Icon(Icons.menu_book, color: AppColors.primary),
             label: i18n.t('learn'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.person_outline),
-            selectedIcon: const Icon(Icons.person, color: AppColors.primary),
+            selectedIcon: Icon(Icons.person, color: AppColors.primary),
             label: i18n.t('profile'),
           ),
         ],

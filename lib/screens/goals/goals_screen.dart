@@ -27,11 +27,15 @@ class GoalsScreen extends StatelessWidget {
           ? Center(
               child: Text(i18n.t('set_goal'),
                   style: const TextStyle(color: AppColors.textSecondary)))
-          : ListView(
+          : ReorderableListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+              buildDefaultDragHandles: true,
+              onReorder: (oldIndex, newIndex) =>
+                  app.reorderGoals(oldIndex, newIndex),
               children: [
                 for (final g in goals)
                   Padding(
+                    key: ValueKey('goal_${g.id}'),
                     padding: const EdgeInsets.only(bottom: 10),
                     child: AppCard(
                       onTap: () => _edit(context, g),
@@ -245,6 +249,7 @@ class _GoalFormState extends State<_GoalForm> {
                       iconKey: _icon,
                       colorValue: _color.value,
                       createdAt: widget.existing?.createdAt ?? DateTime.now(),
+                      sortIndex: widget.existing?.sortIndex ?? 0,
                     );
                     await app.upsertGoal(g);
                     if (!mounted) return;

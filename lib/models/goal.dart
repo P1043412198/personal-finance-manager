@@ -7,6 +7,7 @@ class GoalModel {
   String iconKey;
   int colorValue;
   DateTime createdAt;
+  int sortIndex;
 
   GoalModel({
     required this.id,
@@ -17,6 +18,7 @@ class GoalModel {
     this.iconKey = 'savings',
     this.colorValue = 0xFF2E7D32,
     required this.createdAt,
+    this.sortIndex = 0,
   });
 
   double get progress => target == 0 ? 0 : (current / target).clamp(0.0, 1.0);
@@ -30,6 +32,7 @@ class GoalModel {
         'iconKey': iconKey,
         'colorValue': colorValue,
         'createdAt': createdAt.toIso8601String(),
+        'sortIndex': sortIndex,
       };
 
   factory GoalModel.fromJson(Map j) => GoalModel(
@@ -41,5 +44,6 @@ class GoalModel {
         iconKey: j['iconKey'] as String? ?? 'savings',
         colorValue: (j['colorValue'] as num?)?.toInt() ?? 0xFF2E7D32,
         createdAt: DateTime.parse(j['createdAt']),
+        sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
       );
 }

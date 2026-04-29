@@ -175,7 +175,11 @@ class _TxRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            IconBadge(emoji: emoji, bg: (cat?.color ?? AppColors.muted).withOpacity(0.15)),
+            IconBadge(
+              emoji: emoji,
+              bg: (cat?.color ?? AppColors.muted).withOpacity(0.15),
+              heroTag: 'tx_icon_${t.id}',
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

@@ -7,6 +7,8 @@ class CategoryModel {
   String iconKey;
   /// where this category applies: tasks, transactions, habits, notes
   Set<String> scopes;
+  /// User-defined ordering. Lower values come first within a scope.
+  int sortIndex;
 
   CategoryModel({
     required this.id,
@@ -14,6 +16,7 @@ class CategoryModel {
     required this.colorValue,
     required this.iconKey,
     required this.scopes,
+    this.sortIndex = 0,
   });
 
   Color get color => Color(colorValue);
@@ -24,6 +27,7 @@ class CategoryModel {
         'colorValue': colorValue,
         'iconKey': iconKey,
         'scopes': scopes.toList(),
+        'sortIndex': sortIndex,
       };
 
   factory CategoryModel.fromJson(Map j) => CategoryModel(
@@ -33,6 +37,7 @@ class CategoryModel {
         iconKey: j['iconKey'] as String,
         scopes: ((j['scopes'] as List?)?.map((e) => e.toString()) ?? const [])
             .toSet(),
+        sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
       );
 }
 
