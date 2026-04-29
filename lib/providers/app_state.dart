@@ -8,6 +8,7 @@ import '../models/category.dart';
 import '../models/goal.dart';
 import '../models/habit.dart';
 import '../models/note.dart';
+import '../models/snapshot.dart';
 import '../models/task.dart';
 import '../models/transaction.dart';
 import '../repos/store.dart';
@@ -57,6 +58,12 @@ class AppState extends ChangeNotifier {
     fromJson: (j) => MonthlyBudget.fromJson(j),
     idOf: (b) => b.monthKey,
   );
+  final snapshots = JsonStore<MonthSnapshot>(
+    boxName: 'month_snapshots',
+    toJson: (s) => s.toJson(),
+    fromJson: (j) => MonthSnapshot.fromJson(j),
+    idOf: (s) => s.monthKey,
+  );
 
   /// habit logs: key = habitId_yyyy-MM-dd, value = 1
   final habitLogs = KvStore('habit_logs');
@@ -77,6 +84,7 @@ class AppState extends ChangeNotifier {
       notes.open(),
       goals.open(),
       budgets.open(),
+      snapshots.open(),
       habitLogs.open(),
       prefs.open(),
     ]);
@@ -91,6 +99,60 @@ class AppState extends ChangeNotifier {
     if (categories.all().isEmpty) {
       await _seedCategories();
     }
+    await _captureMissingSnapshots();
+  }
+
+  /// Walk the past 12 months and ensure each non-current month has a stored
+  /// snapshot. Called at startup; cheap because we only re-aggregate months
+  /// that don't already have a snapshot.
+  Future<void> _captureMissingSnapshots() async {
+    final now = DateTime.now();
+    for (var i = 1; i <= 12; i++) {
+      final m = DateTime(now.year, now.month - i);
+      final key =
+          '${m.year.toString().padLeft(4, '0')}-${m.month.toString().padLeft(2, '0')}';
+      if (snapshots.get(key) != null) continue;
+      final tx = transactions.all().where(
+          (t) => t.date.year == m.year && t.date.month == m.month);
+      if (tx.isEmpty) continue;
+      double income = 0;
+      double expense = 0;
+      final byCat = <String, double>{};
+      var count = 0;
+      for (final t in tx) {
+        count += 1;
+        if (t.type == TxType.income) {
+          income += t.amount;
+        } else {
+          expense += t.amount;
+          final id = t.categoryId ?? 'none';
+          byCat.update(id, (v) => v + t.amount, ifAbsent: () => t.amount);
+        }
+      }
+      String? topId;
+      double topAmt = 0;
+      for (final e in byCat.entries) {
+        if (e.value > topAmt) {
+          topAmt = e.value;
+          topId = e.key;
+        }
+      }
+      await snapshots.put(MonthSnapshot(
+        monthKey: key,
+        income: income,
+        expense: expense,
+        txCount: count,
+        topCategoryId: topId,
+        topCategoryAmount: topAmt,
+        takenAt: DateTime.now(),
+      ));
+    }
+  }
+
+  List<MonthSnapshot> snapshotsAll() {
+    final list = snapshots.all();
+    list.sort((a, b) => a.monthKey.compareTo(b.monthKey));
+    return list;
   }
 
   Future<void> _seedCategories() async {
@@ -314,6 +376,7 @@ class AppState extends ChangeNotifier {
       notes.clear(),
       goals.clear(),
       budgets.clear(),
+      snapshots.clear(),
       habitLogs.clear(),
     ]);
     await _seedCategories();
