@@ -38,6 +38,7 @@ class _ForecastsScreenState extends State<ForecastsScreen> {
       txInMonth: monthTx,
       last30DaysTx: last30,
       plannedIncome: budget?.income ?? 0,
+      recurringRules: app.recurringAll(),
       now: now,
     );
 

@@ -13,6 +13,7 @@ class TransactionModel {
   PayMethod method;
   bool savedReceipt;
   String? attachmentPath;
+  String? walletId;
 
   TransactionModel({
     required this.id,
@@ -25,6 +26,7 @@ class TransactionModel {
     this.method = PayMethod.card,
     this.savedReceipt = false,
     this.attachmentPath,
+    this.walletId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -38,6 +40,7 @@ class TransactionModel {
         'method': method.name,
         'savedReceipt': savedReceipt,
         'attachmentPath': attachmentPath,
+        'walletId': walletId,
       };
 
   factory TransactionModel.fromJson(Map j) => TransactionModel(
@@ -55,5 +58,6 @@ class TransactionModel {
         ),
         savedReceipt: j['savedReceipt'] as bool? ?? false,
         attachmentPath: j['attachmentPath'] as String?,
+        walletId: j['walletId'] as String?,
       );
 }

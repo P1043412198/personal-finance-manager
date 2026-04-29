@@ -1,5 +1,7 @@
+import '../models/recurring.dart';
 import '../models/snapshot.dart';
 import '../models/transaction.dart';
+import 'recurring_calc.dart';
 
 /// Aggregate income/expense for a single past month directly from transactions.
 class MonthAggregate {
@@ -85,6 +87,7 @@ EndOfMonthForecast forecastEndOfMonth({
   required Iterable<TransactionModel> txInMonth,
   required Iterable<TransactionModel> last30DaysTx,
   required double plannedIncome,
+  Iterable<RecurringRule> recurringRules = const [],
   DateTime? now,
 }) {
   final today = now ?? DateTime.now();
@@ -106,8 +109,31 @@ EndOfMonthForecast forecastEndOfMonth({
       .where((t) => t.type == TxType.expense)
       .fold<double>(0, (a, t) => a + t.amount);
   final avgDaily = last30Spend > 0 ? last30Spend / 30.0 : (dayNumber > 0 ? spent / dayNumber : 0.0);
-  final projectedSpend = spent + avgDaily * daysLeft;
-  final projectedIncome = income > plannedIncome ? income : plannedIncome;
+
+  // Add upcoming recurring transactions between today and end of month.
+  // These are NOT yet in `txInMonth`, so we add them on top of the run-rate
+  // projection.
+  double upcomingExpense = 0;
+  double upcomingIncome = 0;
+  if (isCurrent) {
+    final eom = DateTime(month.year, month.month, daysInMonth);
+    for (final r in recurringRules) {
+      if (!r.active) continue;
+      final from = today.subtract(const Duration(days: 1));
+      for (final _ in dueDatesBetween(r, from, eom)) {
+        if (r.type == TxType.expense) {
+          upcomingExpense += r.amount;
+        } else {
+          upcomingIncome += r.amount;
+        }
+      }
+    }
+  }
+
+  final projectedSpend = spent + avgDaily * daysLeft + upcomingExpense;
+  final projectedIncomeFromRunRate =
+      income > plannedIncome ? income : plannedIncome;
+  final projectedIncome = projectedIncomeFromRunRate + upcomingIncome;
   return EndOfMonthForecast(
     currentSpent: spent,
     currentIncome: income,

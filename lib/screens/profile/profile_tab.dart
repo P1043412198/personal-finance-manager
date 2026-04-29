@@ -13,7 +13,10 @@ import '../../utils/i18n.dart';
 import '../../widgets/section.dart';
 import '../analytics/analytics_screen.dart';
 import '../categories/categories_screen.dart';
+import '../debts/debts_screen.dart';
 import '../goals/goals_screen.dart';
+import '../recurring/recurring_screen.dart';
+import '../wallets/wallets_screen.dart';
 import '../habits/habits_screen.dart';
 import '../notes/notes_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -79,6 +82,24 @@ class ProfileTab extends StatelessWidget {
                   title: i18n.t('analytics'),
                   onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
+                ),
+                _Tile(
+                  icon: '💳',
+                  title: i18n.t('wallets'),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const WalletsScreen())),
+                ),
+                _Tile(
+                  icon: '🔁',
+                  title: i18n.t('recurring'),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RecurringScreen())),
+                ),
+                _Tile(
+                  icon: '🤝',
+                  title: i18n.t('debts'),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const DebtsScreen())),
                 ),
                 _Tile(
                   icon: '🎯',

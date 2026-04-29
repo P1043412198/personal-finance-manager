@@ -5,16 +5,20 @@ import 'package:uuid/uuid.dart';
 
 import '../models/budget.dart';
 import '../models/category.dart';
+import '../models/debt.dart';
 import '../models/goal.dart';
 import '../models/habit.dart';
 import '../models/note.dart';
+import '../models/recurring.dart';
 import '../models/snapshot.dart';
 import '../models/task.dart';
 import '../models/transaction.dart';
+import '../models/wallet.dart';
 import '../repos/store.dart';
 import '../theme/app_theme.dart';
 import '../theme/palettes.dart';
 import '../utils/home_widget_service.dart';
+import '../utils/recurring_calc.dart';
 
 class AppState extends ChangeNotifier {
   final _uuid = const Uuid();
@@ -67,6 +71,24 @@ class AppState extends ChangeNotifier {
     fromJson: (j) => MonthSnapshot.fromJson(j),
     idOf: (s) => s.monthKey,
   );
+  final wallets = JsonStore<WalletModel>(
+    boxName: 'wallets',
+    toJson: (w) => w.toJson(),
+    fromJson: (j) => WalletModel.fromJson(j),
+    idOf: (w) => w.id,
+  );
+  final recurring = JsonStore<RecurringRule>(
+    boxName: 'recurring_rules',
+    toJson: (r) => r.toJson(),
+    fromJson: (j) => RecurringRule.fromJson(j),
+    idOf: (r) => r.id,
+  );
+  final debts = JsonStore<DebtModel>(
+    boxName: 'debts',
+    toJson: (d) => d.toJson(),
+    fromJson: (j) => DebtModel.fromJson(j),
+    idOf: (d) => d.id,
+  );
 
   /// habit logs: key = habitId_yyyy-MM-dd, value = 1
   final habitLogs = KvStore('habit_logs');
@@ -77,6 +99,11 @@ class AppState extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   AppPalette palette = AppPalette.forest;
   bool onboardingDone = false;
+
+  /// Number of recurring transactions auto-applied during the most recent
+  /// `init()`. Read-once: home tab shows a banner with this count and
+  /// then calls [clearRecurringAppliedBadge] to dismiss it.
+  int recurringAppliedCount = 0;
 
   Future<void> init() async {
     await Hive.initFlutter();
@@ -89,6 +116,9 @@ class AppState extends ChangeNotifier {
       goals.open(),
       budgets.open(),
       snapshots.open(),
+      wallets.open(),
+      recurring.open(),
+      debts.open(),
       habitLogs.open(),
       prefs.open(),
     ]);
@@ -107,7 +137,45 @@ class AppState extends ChangeNotifier {
       await _seedCategories();
     }
     await _captureMissingSnapshots();
+    recurringAppliedCount = await _autoApplyRecurring();
     await _pushHomeWidget();
+  }
+
+  void clearRecurringAppliedBadge() {
+    if (recurringAppliedCount == 0) return;
+    recurringAppliedCount = 0;
+    notifyListeners();
+  }
+
+  /// For each active rule, materialise any due dates strictly after
+  /// `lastApplied` (or `startDate`) and on/before today. Returns the total
+  /// number of transactions created.
+  Future<int> _autoApplyRecurring() async {
+    final today = DateTime.now();
+    var count = 0;
+    for (final r in recurring.all()) {
+      if (!r.active) continue;
+      final from = r.lastApplied ??
+          r.startDate.subtract(const Duration(days: 1));
+      final dates = dueDatesBetween(r, from, today);
+      if (dates.isEmpty) continue;
+      for (final d in dates) {
+        final tx = TransactionModel(
+          id: _uuid.v4(),
+          type: r.type,
+          amount: r.amount,
+          categoryId: r.categoryId,
+          date: d,
+          comment: r.note ?? r.name,
+          walletId: r.walletId,
+        );
+        await transactions.put(tx);
+        count += 1;
+      }
+      r.lastApplied = dates.last;
+      await recurring.put(r);
+    }
+    return count;
   }
 
   /// Walk the past 12 months and ensure each non-current month has a stored
@@ -387,6 +455,134 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Wallets
+  List<WalletModel> walletAll({bool includeArchived = false}) {
+    final list = wallets.all().where((w) => includeArchived || !w.archived).toList();
+    list.sort((a, b) {
+      final s = a.sortIndex.compareTo(b.sortIndex);
+      if (s != 0) return s;
+      return a.createdAt.compareTo(b.createdAt);
+    });
+    return list;
+  }
+
+  /// Effective balance = initial balance + sum of own transactions
+  /// (income +, expense -). Transactions with `walletId == null` are not
+  /// attributed to any wallet.
+  double walletBalance(String walletId) {
+    final w = wallets.get(walletId);
+    if (w == null) return 0;
+    double bal = w.initialBalance;
+    for (final t in transactions.all()) {
+      if (t.walletId != walletId) continue;
+      bal += t.type == TxType.income ? t.amount : -t.amount;
+    }
+    return bal;
+  }
+
+  /// Sum of [walletBalance] over all non-archived wallets.
+  double walletsTotalBalance() {
+    var total = 0.0;
+    for (final w in walletAll()) {
+      total += walletBalance(w.id);
+    }
+    return total;
+  }
+
+  Future<void> upsertWallet(WalletModel w) async {
+    await wallets.put(w);
+    notifyListeners();
+  }
+
+  Future<void> deleteWallet(String id) async {
+    await wallets.delete(id);
+    notifyListeners();
+  }
+
+  Future<void> reorderWallets(int oldIndex, int newIndex) async {
+    final list = walletAll();
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex < 0 || oldIndex >= list.length) return;
+    if (newIndex < 0 || newIndex >= list.length) return;
+    final moved = list.removeAt(oldIndex);
+    list.insert(newIndex, moved);
+    for (var i = 0; i < list.length; i++) {
+      list[i].sortIndex = i;
+      await wallets.put(list[i]);
+    }
+    notifyListeners();
+  }
+
+  // --- Recurring
+  List<RecurringRule> recurringAll() {
+    final list = recurring.all();
+    list.sort((a, b) {
+      if (a.active != b.active) return a.active ? -1 : 1;
+      return a.startDate.compareTo(b.startDate);
+    });
+    return list;
+  }
+
+  Future<void> upsertRecurring(RecurringRule r) async {
+    await recurring.put(r);
+    notifyListeners();
+  }
+
+  Future<void> deleteRecurring(String id) async {
+    await recurring.delete(id);
+    notifyListeners();
+  }
+
+  // --- Debts
+  List<DebtModel> debtsAll({bool includeArchived = false}) {
+    final list = debts.all().where((d) => includeArchived || !d.archived).toList();
+    list.sort((a, b) {
+      if (a.isPaid != b.isPaid) return a.isPaid ? 1 : -1;
+      final aDue = a.dueDate ?? DateTime(9999);
+      final bDue = b.dueDate ?? DateTime(9999);
+      return aDue.compareTo(bDue);
+    });
+    return list;
+  }
+
+  /// Sum of remaining amounts grouped by direction.
+  Map<DebtDirection, double> debtTotals() {
+    final out = <DebtDirection, double>{
+      DebtDirection.youOwe: 0,
+      DebtDirection.owesYou: 0,
+    };
+    for (final d in debtsAll()) {
+      out[d.direction] = (out[d.direction] ?? 0) + d.remaining;
+    }
+    return out;
+  }
+
+  Future<void> upsertDebt(DebtModel d) async {
+    await debts.put(d);
+    notifyListeners();
+  }
+
+  Future<void> deleteDebt(String id) async {
+    await debts.delete(id);
+    notifyListeners();
+  }
+
+  Future<void> addDebtPayment(String debtId, DebtPayment p) async {
+    final d = debts.get(debtId);
+    if (d == null) return;
+    d.payments.add(p);
+    await debts.put(d);
+    notifyListeners();
+  }
+
+  Future<void> deleteDebtPayment(String debtId, String paymentId) async {
+    final d = debts.get(debtId);
+    if (d == null) return;
+    d.payments.removeWhere((p) => p.id == paymentId);
+    await debts.put(d);
+    notifyListeners();
+  }
+
   // --- Budgets
   MonthlyBudget? budgetFor(DateTime month) {
     final key = '${month.year.toString().padLeft(4, '0')}-${month.month.toString().padLeft(2, '0')}';
@@ -446,6 +642,9 @@ class AppState extends ChangeNotifier {
       goals.clear(),
       budgets.clear(),
       snapshots.clear(),
+      wallets.clear(),
+      recurring.clear(),
+      debts.clear(),
       habitLogs.clear(),
     ]);
     await _seedCategories();

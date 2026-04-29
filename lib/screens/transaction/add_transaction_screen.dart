@@ -24,6 +24,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late TextEditingController _shopCtrl;
   late TextEditingController _commentCtrl;
   String? _categoryId;
+  String? _walletId;
   DateTime _date = DateTime.now();
   PayMethod _method = PayMethod.card;
   bool _saveReceipt = true;
@@ -37,6 +38,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _shopCtrl = TextEditingController(text: e?.shop ?? '');
     _commentCtrl = TextEditingController(text: e?.comment ?? '');
     _categoryId = e?.categoryId;
+    _walletId = e?.walletId;
     _date = e?.date ?? DateTime.now();
     _method = e?.method ?? PayMethod.card;
     _saveReceipt = e?.savedReceipt ?? true;
@@ -64,6 +66,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       date: _date,
       method: _method,
       savedReceipt: _saveReceipt,
+      walletId: _walletId,
     );
     await app.upsertTransaction(tx);
     if (!mounted) return;
@@ -205,6 +208,52 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 if (picked != null) setState(() => _method = picked);
               },
             ),
+            if (app.walletAll().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _DropdownTile(
+                icon: '💼',
+                text: () {
+                  if (_walletId == null) return i18n.t('no_wallet');
+                  final w = app.walletAll().firstWhere(
+                        (w) => w.id == _walletId,
+                        orElse: () => app.walletAll().first,
+                      );
+                  return w.name;
+                }(),
+                onTap: () async {
+                  final picked = await showModalBottomSheet<String?>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (_) => SafeArea(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          ListTile(
+                            leading: const Text('🚫',
+                                style: TextStyle(fontSize: 22)),
+                            title: Text(i18n.t('no_wallet')),
+                            onTap: () => Navigator.pop(context, ''),
+                          ),
+                          for (final w in app.walletAll())
+                            ListTile(
+                              leading: const Text('💼',
+                                  style: TextStyle(fontSize: 22)),
+                              title: Text(w.name),
+                              subtitle: Text(Fmt.currency(
+                                  app.walletBalance(w.id),
+                                  symbol: w.currency,
+                                  decimals: 2)),
+                              onTap: () => Navigator.pop(context, w.id),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                  if (picked == null) return;
+                  setState(() => _walletId = picked.isEmpty ? null : picked);
+                },
+              ),
+            ],
             const SizedBox(height: 8),
             TextField(
               controller: _shopCtrl,
