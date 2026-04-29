@@ -128,7 +128,7 @@ class _CategoryFormState extends State<_CategoryForm> {
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.existing?.name ?? '');
-    _scopes = Set.from(widget.existing?.scopes ?? {'tx'});
+    _scopes = Set.from(widget.existing?.scopes ?? {widget.scope});
     _icon = widget.existing?.iconKey ?? 'other';
     _color = widget.existing != null ? Color(widget.existing!.colorValue) : AppColors.primary;
   }
