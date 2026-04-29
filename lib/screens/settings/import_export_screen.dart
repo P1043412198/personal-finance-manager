@@ -116,13 +116,24 @@ class ImportExportScreen extends StatelessWidget {
     await Share.shareXFiles([XFile(f.path)], text: 'Personal finance backup');
   }
 
+  String _csvCell(String? v) => '"${(v ?? '').replaceAll('"', '""')}"';
+
   Future<void> _exportCsv(BuildContext context, AppState app) async {
     final lines = <String>['date,type,amount,currency,category,wallet,shop,comment,method'];
     for (final t in app.txAll()) {
-      final cat = app.categoryById(t.categoryId)?.name ?? '';
-      final w = t.walletId != null ? (app.wallets.get(t.walletId!)?.name ?? '') : '';
-      lines.add(
-          '${t.date.toIso8601String()},${t.type.name},${t.amount},${t.currency},"$cat","$w","${(t.shop ?? '').replaceAll('"', '""')}","${(t.comment ?? '').replaceAll('"', '""')}",${t.method.name}');
+      final cat = app.categoryById(t.categoryId)?.name;
+      final w = t.walletId != null ? app.wallets.get(t.walletId!)?.name : null;
+      lines.add([
+        t.date.toIso8601String(),
+        t.type.name,
+        t.amount,
+        _csvCell(t.currency),
+        _csvCell(cat),
+        _csvCell(w),
+        _csvCell(t.shop),
+        _csvCell(t.comment),
+        t.method.name,
+      ].join(','));
     }
     final dir = await getTemporaryDirectory();
     final f = File('${dir.path}/transactions_${DateTime.now().millisecondsSinceEpoch}.csv');

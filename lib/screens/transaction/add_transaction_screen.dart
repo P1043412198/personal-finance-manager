@@ -40,8 +40,9 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late TxType _type;
   late TextEditingController _amountCtrl;
-  late TextEditingController _shopCtrl;
   late TextEditingController _commentCtrl;
+  late TextEditingController _shopCtrl;
+  late FocusNode _shopFocus;
   String? _categoryId;
   DateTime _date = DateTime.now();
   PayMethod _method = PayMethod.card;
@@ -58,6 +59,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _amountCtrl = TextEditingController(
         text: initialAmount == null ? '' : initialAmount.toStringAsFixed(initialAmount.truncateToDouble() == initialAmount ? 0 : 2));
     _shopCtrl = TextEditingController(text: e?.shop ?? pre?.shop ?? '');
+    _shopFocus = FocusNode();
     _commentCtrl = TextEditingController(text: e?.comment ?? '');
     _categoryId = e?.categoryId;
     _date = e?.date ?? pre?.date ?? DateTime.now();
@@ -69,8 +71,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   void dispose() {
     _amountCtrl.dispose();
-    _shopCtrl.dispose();
     _commentCtrl.dispose();
+    _shopCtrl.dispose();
+    _shopFocus.dispose();
     super.dispose();
   }
 
@@ -112,12 +115,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         double.tryParse(_amountCtrl.text.replaceAll(',', '.').replaceAll(' ', ''));
     if (amount == null || amount <= 0) return;
     final app = context.read<AppState>();
+    final shop = _shopCtrl.text.trim();
     final tx = TransactionModel(
       id: widget.existing?.id ?? app.newId(),
       type: _type,
       amount: amount,
+      currency: widget.existing?.currency ?? app.currency,
       categoryId: _categoryId,
-      shop: _shopCtrl.text.trim().isEmpty ? null : _shopCtrl.text.trim(),
+      walletId: widget.existing?.walletId,
+      shop: shop.isEmpty ? null : shop,
       comment: _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
       date: _date,
       method: _method,
@@ -282,8 +288,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               },
             ),
             const SizedBox(height: 8),
-            Autocomplete<String>(
-              initialValue: TextEditingValue(text: _shopCtrl.text),
+            RawAutocomplete<String>(
+              textEditingController: _shopCtrl,
+              focusNode: _shopFocus,
               optionsBuilder: (v) {
                 final q = v.text.trim().toLowerCase();
                 if (q.isEmpty) return const Iterable<String>.empty();
@@ -295,14 +302,32 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                 return all.take(6);
               },
               onSelected: (s) => _shopCtrl.text = s,
-              fieldViewBuilder: (ctx, ctrl, focus, onSubmit) {
-                _shopCtrl = ctrl;
-                return TextField(
-                  controller: ctrl,
-                  focusNode: focus,
-                  decoration: InputDecoration(hintText: i18n.t('shop')),
-                );
-              },
+              fieldViewBuilder: (ctx, ctrl, focus, onSubmit) => TextField(
+                controller: ctrl,
+                focusNode: focus,
+                decoration: InputDecoration(hintText: i18n.t('shop')),
+              ),
+              optionsViewBuilder: (ctx, onSelected, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 2,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 220, maxWidth: 320),
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      children: [
+                        for (final o in options)
+                          ListTile(
+                            dense: true,
+                            title: Text(o),
+                            onTap: () => onSelected(o),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
