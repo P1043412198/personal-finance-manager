@@ -36,6 +36,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool? _locked;
+  bool? _lastSecure;
   static const _secureChannel = MethodChannel('com.vibesight.personal_finance/secure');
 
   Future<void> _applySecure(bool on) async {
@@ -44,10 +45,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  void _onAppStateChanged() {
+    final v = widget.state.secureScreen;
+    if (_lastSecure != v) {
+      _lastSecure = v;
+      _applySecure(v);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.state.addListener(_onAppStateChanged);
+    _onAppStateChanged();
     _checkLockOnLaunch();
   }
 
@@ -59,6 +70,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.state.removeListener(_onAppStateChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -89,7 +101,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ],
       child: Consumer2<AppState, I18n>(
         builder: (context, app, i18n, _) {
-          _applySecure(app.secureScreen);
           return DynamicColorBuilder(builder: (lightDyn, darkDyn) {
             final useDyn = app.dynamicColors;
             return MaterialApp(
