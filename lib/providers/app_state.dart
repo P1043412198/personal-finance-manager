@@ -772,9 +772,12 @@ class AppState extends ChangeNotifier {
       achievements.clear(),
       rules.clear(),
       templates.clear(),
+      rates.clear(),
       habitLogs.clear(),
     ]);
     await _seedCategories();
+    await _seedRates();
+    await _seedBelarusRules();
     await NotificationService.instance.cancelAll();
     notifyListeners();
   }

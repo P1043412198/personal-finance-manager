@@ -34,7 +34,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  bool _locked = false;
+  bool? _locked;
   static const _secureChannel = MethodChannel('com.vibesight.personal_finance/secure');
 
   Future<void> _applySecure(bool on) async {
@@ -51,9 +51,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   Future<void> _checkLockOnLaunch() async {
-    if (await LockService.instance.isEnabled()) {
-      setState(() => _locked = true);
-    }
+    final enabled = await LockService.instance.isEnabled();
+    if (!mounted) return;
+    setState(() => _locked = enabled);
   }
 
   @override
@@ -114,6 +114,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               GlobalWidgetsLocalizations.delegate,
             ],
             home: _buildHome(app),
+            builder: (context, child) {
+              if (_locked == null) {
+                return const Scaffold(body: SizedBox.shrink());
+              }
+              return child ?? const SizedBox.shrink();
+            },
           );
           });
         },
@@ -122,8 +128,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   Widget _buildHome(AppState app) {
+    if (_locked == true) return LockScreen(onUnlock: _onUnlock);
     if (!app.onboardingDone) return const OnboardingScreen();
-    if (_locked) return LockScreen(onUnlock: _onUnlock);
     return const HomeShell();
   }
 }
