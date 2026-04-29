@@ -1,0 +1,52 @@
+name: personal_finance
+description: "Личный менеджер и финансовый помощник: задачи, привычки, бюджет, заметки."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.4
+  provider: ^6.1.2
+  intl: ^0.20.2
+  fl_chart: ^0.69.0
+  uuid: ^4.5.1
+  image_picker: ^1.1.2
+  share_plus: ^10.1.2
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.3
+  table_calendar: ^3.1.2
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  local_auth: ^2.3.0
+  file_picker: ^8.1.4
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.5
+  permission_handler: ^11.3.1
+  dynamic_color: ^1.7.0
+  speech_to_text: ^7.0.0
+  pdf: ^3.11.1
+  printing: ^5.13.4
+  reorderables: ^0.6.0
+  google_mlkit_text_recognition: ^0.13.0
+  flutter_timezone: ^5.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/images/
