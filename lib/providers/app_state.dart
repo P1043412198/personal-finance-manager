@@ -309,10 +309,10 @@ class AppState extends ChangeNotifier {
     await transactions.put(t);
     // update wallet balance
     if (prev != null && prev.walletId != null) {
-      _bumpWallet(prev.walletId!, prev.type == TxType.income ? -prev.amount : prev.amount);
+      await _bumpWallet(prev.walletId!, prev.type == TxType.income ? -prev.amount : prev.amount);
     }
     if (t.walletId != null) {
-      _bumpWallet(t.walletId!, t.type == TxType.income ? t.amount : -t.amount);
+      await _bumpWallet(t.walletId!, t.type == TxType.income ? t.amount : -t.amount);
     }
     if (isNew) {
       _checkAchievements(triggeredBy: 'tx');
@@ -358,16 +358,16 @@ class AppState extends ChangeNotifier {
     final prev = transactions.get(id);
     await transactions.delete(id);
     if (prev != null && prev.walletId != null) {
-      _bumpWallet(prev.walletId!, prev.type == TxType.income ? -prev.amount : prev.amount);
+      await _bumpWallet(prev.walletId!, prev.type == TxType.income ? -prev.amount : prev.amount);
     }
     notifyListeners();
   }
 
-  void _bumpWallet(String walletId, double delta) {
+  Future<void> _bumpWallet(String walletId, double delta) async {
     final w = wallets.get(walletId);
     if (w == null) return;
     w.balance += delta;
-    wallets.put(w);
+    await wallets.put(w);
   }
 
   // --- Wallets
@@ -422,7 +422,7 @@ class AppState extends ChangeNotifier {
         );
         await transactions.put(t);
         if (t.walletId != null) {
-          _bumpWallet(t.walletId!, t.type == TxType.income ? t.amount : -t.amount);
+          await _bumpWallet(t.walletId!, t.type == TxType.income ? t.amount : -t.amount);
         }
         r.nextRun = r.advance(r.nextRun);
         any = true;
