@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_finance/models/recurring.dart';
 import 'package:personal_finance/models/snapshot.dart';
 import 'package:personal_finance/models/transaction.dart';
 import 'package:personal_finance/utils/forecast.dart';
@@ -106,6 +107,74 @@ void main() {
       expect(eom.dayNumber, 31);
       // No extrapolation past month
       expect(eom.projectedSpent, 1000);
+    });
+
+    test('upcoming recurring adds to projection only AFTER today', () {
+      final month = DateTime(2026, 4);
+      // Today is the 15th and the recurring tx for the 15th was already
+      // applied at startup, so it lives in txInMonth.
+      final txInMonth = [
+        _tx(amount: 100, type: TxType.expense, date: DateTime(2026, 4, 15)),
+      ];
+      final rules = [
+        RecurringRule(
+          id: 'r',
+          name: 'Subscription',
+          type: TxType.expense,
+          amount: 100,
+          freq: RecurFreq.monthly,
+          dayOfMonth: 15,
+          startDate: DateTime(2026, 1, 1),
+        ),
+      ];
+      final eom = forecastEndOfMonth(
+        month: month,
+        txInMonth: txInMonth,
+        last30DaysTx: const [],
+        plannedIncome: 0,
+        recurringRules: rules,
+        now: DateTime(2026, 4, 15),
+      );
+      expect(eom.currentSpent, 100);
+      // Without rules this run-rate forecast is: 100 + (100/15)*15 = 200.
+      // With the buggy `from = today - 1d` the April 15 occurrence would be
+      // double-counted as +100 ⇒ 300. The correct behaviour skips it.
+      expect(eom.projectedSpent, closeTo(200, 1e-6));
+
+      // Also verify the run-rate-only baseline.
+      final eomNoRules = forecastEndOfMonth(
+        month: month,
+        txInMonth: txInMonth,
+        last30DaysTx: const [],
+        plannedIncome: 0,
+        now: DateTime(2026, 4, 15),
+      );
+      expect(eomNoRules.projectedSpent, eom.projectedSpent);
+    });
+
+    test('upcoming recurring after today is added once', () {
+      final month = DateTime(2026, 4);
+      // Today is the 10th. Subscription on the 20th is still upcoming.
+      final rules = [
+        RecurringRule(
+          id: 'r',
+          name: 'Subscription',
+          type: TxType.expense,
+          amount: 100,
+          freq: RecurFreq.monthly,
+          dayOfMonth: 20,
+          startDate: DateTime(2026, 1, 1),
+        ),
+      ];
+      final eom = forecastEndOfMonth(
+        month: month,
+        txInMonth: const [],
+        last30DaysTx: const [],
+        plannedIncome: 0,
+        recurringRules: rules,
+        now: DateTime(2026, 4, 10),
+      );
+      expect(eom.projectedSpent, 100);
     });
   });
 

@@ -81,6 +81,31 @@ class HomeTab extends StatelessWidget {
                 ),
               ],
             ),
+            if (app.recurringAppliedCount > 0) ...[
+              const SizedBox(height: 12),
+              AppCard(
+                padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                color: AppColors.income.withOpacity(0.12),
+                child: Row(
+                  children: [
+                    const Text('🔁', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${i18n.t('recurring_applied')}: ${app.recurringAppliedCount}',
+                        style: TextStyle(
+                            color: AppColors.income,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: app.clearRecurringAppliedBadge,
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             // Budget card
             AppCard(
