@@ -30,6 +30,8 @@ class _BudgetTabState extends State<BudgetTab> {
     final app = context.watch<AppState>();
     final i18n = context.watch<I18n>();
     final tx = app.txInMonth(_month);
+    final previousMonth = DateTime(_month.year, _month.month - 1);
+    final prevTx = app.txInMonth(previousMonth);
     final budget = app.budgetFor(_month);
     final metrics = BudgetMetrics.compute(
       month: _month,
@@ -41,6 +43,20 @@ class _BudgetTabState extends State<BudgetTab> {
       budget: budget,
       categoryById: app.categoryById,
     );
+    final alerts = buildBudgetAlerts(metrics: metrics, categories: breakdown);
+    final health = budgetHealthReport(metrics: metrics, categories: breakdown);
+    final comparison = compareWithPreviousMonth(
+      month: _month,
+      currentTx: tx,
+      previousTx: prevTx,
+      categoryById: app.categoryById,
+    );
+    final weeks = weeklyBudgets(
+      month: _month,
+      txInMonth: tx,
+      variablePlan: metrics.plannedExpense,
+    );
+    final economy = economySuggestions(metrics: metrics, categories: breakdown);
 
     return Scaffold(
       appBar: AppBar(
@@ -75,52 +91,47 @@ class _BudgetTabState extends State<BudgetTab> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
-          if (budget == null)
-            AppCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(i18n.t('no_budget_yet'),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text(i18n.t('budget_planner'),
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13)),
-                  const SizedBox(height: 14),
-                  ElevatedButton(
-                    onPressed: () => _openPlanner(context),
-                    child: Text(i18n.t('create_budget')),
-                  ),
-                ],
-              ),
-            )
-          else ...[
+          if (budget == null) ...[
+            _EmptyBudgetCard(onCreate: () => _openPlanner(context)),
+          ] else ...[
+            _BudgetHealthCard(report: health),
+            const SizedBox(height: 12),
+            _TodayActionCard(metrics: metrics, categories: breakdown),
+            const SizedBox(height: 12),
             _PlanFactSummary(metrics: metrics),
             const SizedBox(height: 12),
-            _SafeTodayCard(metrics: metrics),
+            _AlertsCard(alerts: alerts),
+            const SizedBox(height: 18),
+            _SectionRow(
+              title: 'Обязательные платежи и подписки',
+              actionLabel: i18n.t('edit'),
+              onAction: () => _openPlanner(context, existing: budget),
+            ),
+            _FixedCostsCard(budget: budget),
+            const SizedBox(height: 18),
+            SectionHeader(title: 'Бюджет по неделям'),
+            _WeeklyBudgetCard(weeks: weeks),
             const SizedBox(height: 18),
             SectionHeader(title: i18n.t('daily_pace')),
-            _DailyPaceCard(month: _month, tx: tx, plan: budget.totalLimit),
+            _DailyPaceCard(month: _month, tx: tx, plan: metrics.plannedExpense),
             const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(child: SectionHeader(title: i18n.t('category_limits'))),
-                TextButton.icon(
-                  onPressed: () => _openPlanner(context, existing: budget),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: Text(i18n.t('edit')),
-                ),
-              ],
+            SectionHeader(title: 'Сравнение с прошлым месяцем'),
+            _MonthComparisonCard(comparison: comparison),
+            const SizedBox(height: 18),
+            SectionHeader(title: 'Режим экономии'),
+            _EconomyModeCard(suggestions: economy),
+            const SizedBox(height: 18),
+            _SectionRow(
+              title: i18n.t('category_limits'),
+              actionLabel: i18n.t('edit'),
+              onAction: () => _openPlanner(context, existing: budget),
             ),
             AppCard(
               padding: const EdgeInsets.all(16),
               child: breakdown.isEmpty
                   ? Center(
                       child: Text(i18n.t('no_data_yet'),
-                          style: const TextStyle(
-                              color: AppColors.textSecondary)),
+                          style: const TextStyle(color: AppColors.textSecondary)),
                     )
                   : Column(
                       children: [
@@ -130,24 +141,7 @@ class _BudgetTabState extends State<BudgetTab> {
             ),
             const SizedBox(height: 18),
             SectionHeader(title: i18n.t('forecast_short')),
-            AppCard(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(Fmt.currency(metrics.forecast, symbol: app.currency),
-                      style: const TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(
-                      '${i18n.t('avg_per_day')}: ${Fmt.currency(metrics.dayNumber > 0 ? metrics.expense / metrics.dayNumber : 0, symbol: app.currency)}',
-                      style: const TextStyle(color: AppColors.textSecondary)),
-                  const SizedBox(height: 12),
-                  _BudgetHealthBadge(
-                      forecast: metrics.forecast, plan: budget.totalLimit),
-                ],
-              ),
-            ),
+            _ForecastCard(metrics: metrics),
           ],
           const SizedBox(height: 18),
           SectionHeader(title: i18n.t('debt_advice')),
@@ -172,8 +166,7 @@ class _BudgetTabState extends State<BudgetTab> {
       showDragHandle: true,
       useSafeArea: true,
       builder: (_) => Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: BudgetPlannerSheet(month: _month, existing: existing),
       ),
     );
@@ -218,6 +211,157 @@ class _BudgetTabState extends State<BudgetTab> {
   }
 }
 
+class _EmptyBudgetCard extends StatelessWidget {
+  final VoidCallback onCreate;
+  const _EmptyBudgetCard({required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final i18n = context.watch<I18n>();
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(i18n.t('no_budget_yet'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text('Создай месячный план: доход, обязательные платежи, подписки и лимиты категорий.',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          const SizedBox(height: 14),
+          ElevatedButton(onPressed: onCreate, child: Text(i18n.t('create_budget'))),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionRow extends StatelessWidget {
+  final String title;
+  final String actionLabel;
+  final VoidCallback onAction;
+  const _SectionRow({required this.title, required this.actionLabel, required this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: SectionHeader(title: title)),
+        TextButton.icon(
+          onPressed: onAction,
+          icon: const Icon(Icons.edit, size: 16),
+          label: Text(actionLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _BudgetHealthCard extends StatelessWidget {
+  final BudgetHealthReport report;
+  const _BudgetHealthCard({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = report.score >= 80
+        ? AppColors.income
+        : report.score >= 55
+            ? AppColors.warning
+            : AppColors.danger;
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      color: color.withOpacity(0.08),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 76,
+            height: 76,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: report.score / 100,
+                  strokeWidth: 8,
+                  backgroundColor: AppColors.muted,
+                  color: color,
+                ),
+                Text('${report.score}',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: color)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Финансовое здоровье: ${report.label}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text(report.message,
+                    style: const TextStyle(color: AppColors.textSecondary, height: 1.35)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayActionCard extends StatelessWidget {
+  final BudgetMetrics metrics;
+  final List<CategoryPlanFact> categories;
+  const _TodayActionCard({required this.metrics, required this.categories});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final topRisk = categories
+        .where((c) => c.plan > 0 && c.fact >= c.plan * 0.8)
+        .map((c) => c.name)
+        .take(2)
+        .join(', ');
+    final riskText = metrics.freeFundsFact < 0
+        ? 'Высокий'
+        : metrics.forecast > metrics.plannedOutflow
+            ? 'Средний'
+            : 'Низкий';
+    final accent = riskText == 'Высокий'
+        ? AppColors.danger
+        : riskText == 'Средний'
+            ? AppColors.warning
+            : AppColors.income;
+    return AppCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.today_outlined, color: accent),
+              const SizedBox(width: 8),
+              const Text('Что делать сегодня?',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(Fmt.currency(metrics.safePerDay, symbol: app.currency),
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: accent)),
+          const SizedBox(height: 4),
+          Text('Безопасно потратить сегодня. Риск перерасхода: $riskText.',
+              style: const TextStyle(color: AppColors.textSecondary)),
+          if (topRisk.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Лучше сократить: $topRisk',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _PlanFactSummary extends StatelessWidget {
   final BudgetMetrics metrics;
   const _PlanFactSummary({required this.metrics});
@@ -226,16 +370,15 @@ class _PlanFactSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final i18n = context.watch<I18n>();
-    String money(double v) =>
-        Fmt.currency(v, symbol: app.currency, decimals: 0);
+    String money(double v) => Fmt.currency(v, symbol: app.currency, decimals: 0);
     String signed(double v) {
       if (v == 0) return money(0);
       final sign = v > 0 ? '+' : '−';
       return '$sign${money(v.abs())}';
     }
 
-    final pct = metrics.plannedExpense > 0
-        ? (metrics.expense / metrics.plannedExpense).clamp(0.0, 1.0)
+    final pct = metrics.plannedOutflow > 0
+        ? ((metrics.expense + metrics.fixedCosts) / metrics.plannedOutflow).clamp(0.0, 1.0)
         : 0.0;
 
     return AppCard(
@@ -244,34 +387,14 @@ class _PlanFactSummary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(i18n.t('plan_vs_fact'),
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 14),
-          // Header
           Row(
             children: [
               const Expanded(flex: 3, child: SizedBox()),
-              Expanded(
-                flex: 2,
-                child: Text(i18n.t('plan'),
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12)),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(i18n.t('fact'),
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12)),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(i18n.t('delta'),
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12)),
-              ),
+              Expanded(flex: 2, child: _HeaderCell(i18n.t('plan'))),
+              Expanded(flex: 2, child: _HeaderCell(i18n.t('fact'))),
+              Expanded(flex: 2, child: _HeaderCell(i18n.t('delta'))),
             ],
           ),
           const Divider(height: 16),
@@ -280,34 +403,35 @@ class _PlanFactSummary extends StatelessWidget {
             plan: money(metrics.plannedIncome),
             fact: money(metrics.income),
             delta: signed(metrics.income - metrics.plannedIncome),
-            deltaColor: metrics.income >= metrics.plannedIncome
-                ? AppColors.income
-                : AppColors.danger,
+            deltaColor: metrics.income >= metrics.plannedIncome ? AppColors.income : AppColors.danger,
+          ),
+          _PFRow(
+            label: 'Обязательные',
+            plan: money(metrics.fixedCosts),
+            fact: money(metrics.fixedCosts),
+            delta: money(0),
+            deltaColor: AppColors.textSecondary,
           ),
           _PFRow(
             label: i18n.t('expenses'),
             plan: money(metrics.plannedExpense),
             fact: money(metrics.expense),
             delta: signed(metrics.expense - metrics.plannedExpense),
-            deltaColor: metrics.expense <= metrics.plannedExpense
-                ? AppColors.income
-                : AppColors.danger,
+            deltaColor: metrics.expense <= metrics.plannedExpense ? AppColors.income : AppColors.danger,
           ),
           _PFRow(
             label: i18n.t('free_funds'),
             plan: money(metrics.freeFundsPlan),
             fact: money(metrics.freeFundsFact),
             delta: signed(metrics.freeFundsFact - metrics.freeFundsPlan),
-            deltaColor: metrics.freeFundsFact >= metrics.freeFundsPlan
-                ? AppColors.income
-                : AppColors.danger,
+            deltaColor: metrics.freeFundsFact >= metrics.freeFundsPlan ? AppColors.income : AppColors.danger,
             highlight: true,
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: pct,
+              value: pct.toDouble(),
               minHeight: 8,
               backgroundColor: AppColors.muted,
               color: pct > 0.95
@@ -318,11 +442,23 @@ class _PlanFactSummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text('${(pct * 100).round()}% ${i18n.t('on_plan')}',
+          Text('${(pct * 100).round()}% от полного плана расходов',
               style: const TextStyle(color: AppColors.textSecondary)),
         ],
       ),
     );
+  }
+}
+
+class _HeaderCell extends StatelessWidget {
+  final String text;
+  const _HeaderCell(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text,
+        textAlign: TextAlign.right,
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12));
   }
 }
 
@@ -355,23 +491,14 @@ class _PFRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(label,
-                style: TextStyle(
-                    fontWeight:
-                        highlight ? FontWeight.w800 : FontWeight.w500)),
+                style: TextStyle(fontWeight: highlight ? FontWeight.w800 : FontWeight.w500)),
           ),
-          Expanded(
-            flex: 2,
-            child: Text(plan, textAlign: TextAlign.right, style: style),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(fact, textAlign: TextAlign.right, style: style),
-          ),
+          Expanded(flex: 2, child: Text(plan, textAlign: TextAlign.right, style: style)),
+          Expanded(flex: 2, child: Text(fact, textAlign: TextAlign.right, style: style)),
           Expanded(
             flex: 2,
             child: Text(delta,
-                textAlign: TextAlign.right,
-                style: style.copyWith(color: deltaColor)),
+                textAlign: TextAlign.right, style: style.copyWith(color: deltaColor)),
           ),
         ],
       ),
@@ -379,60 +506,150 @@ class _PFRow extends StatelessWidget {
   }
 }
 
-class _SafeTodayCard extends StatelessWidget {
-  final BudgetMetrics metrics;
-  const _SafeTodayCard({required this.metrics});
+class _AlertsCard extends StatelessWidget {
+  final List<BudgetAlert> alerts;
+  const _AlertsCard({required this.alerts});
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final i18n = context.watch<I18n>();
-    final daysLeft = metrics.daysLeft;
-    final isRu = i18n.lang == AppLang.ru;
-    final dayWord = isRu
-        ? daysWord(
-            n: daysLeft,
-            one: i18n.t('days_left_one'),
-            few: i18n.t('days_left_few'),
-            many: i18n.t('days_left'),
-          )
-        : (daysLeft == 1 ? i18n.t('days_left_one') : i18n.t('days_left'));
     return AppCard(
-      padding: const EdgeInsets.all(18),
-      color: AppColors.muted,
-      child: Row(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text('Предупреждения',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          for (final alert in alerts.take(5)) _AlertRow(alert: alert),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlertRow extends StatelessWidget {
+  final BudgetAlert alert;
+  const _AlertRow({required this.alert});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = alert.level == BudgetAlertLevel.danger
+        ? AppColors.danger
+        : alert.level == BudgetAlertLevel.warning
+            ? AppColors.warning
+            : AppColors.income;
+    final icon = alert.level == BudgetAlertLevel.danger
+        ? Icons.error_outline
+        : alert.level == BudgetAlertLevel.warning
+            ? Icons.warning_amber_rounded
+            : Icons.check_circle_outline;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(i18n.t('safe_per_day'),
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(Fmt.currency(metrics.safePerDay, symbol: app.currency),
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800)),
+                Text(alert.title,
+                    style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(alert.message,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.25)),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
+        ],
+      ),
+    );
+  }
+}
+
+class _FixedCostsCard extends StatelessWidget {
+  final MonthlyBudget budget;
+  const _FixedCostsCard({required this.budget});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final enabled = budget.fixedCosts.where((e) => e.enabled).toList();
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: enabled.isEmpty
+          ? const Text('Пока нет обязательных платежей. Добавь аренду, кредиты, коммуналку или подписки в планировщике.',
+              style: TextStyle(color: AppColors.textSecondary))
+          : Column(
               children: [
-                Text('$daysLeft',
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800)),
-                Text(dayWord,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary)),
+                for (final item in enabled)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Icon(item.subscription ? Icons.subscriptions_outlined : Icons.receipt_long_outlined,
+                            color: AppColors.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(item.name,
+                              style: const TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                        Text(Fmt.currency(item.amount, symbol: app.currency),
+                            style: const TextStyle(fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 18),
+                Row(
+                  children: [
+                    const Expanded(child: Text('Итого обязательных')),
+                    Text(Fmt.currency(budget.fixedCostsTotal, symbol: app.currency),
+                        style: const TextStyle(fontWeight: FontWeight.w900)),
+                  ],
+                ),
               ],
             ),
-          ),
+    );
+  }
+}
+
+class _WeeklyBudgetCard extends StatelessWidget {
+  final List<WeeklyBudget> weeks;
+  const _WeeklyBudgetCard({required this.weeks});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          for (final w in weeks)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text('Неделя ${w.week}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                      Text('${Fmt.currency(w.fact, symbol: app.currency)} / ${Fmt.currency(w.plan, symbol: app.currency)}',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: w.progress,
+                      minHeight: 6,
+                      backgroundColor: AppColors.muted,
+                      color: w.fact > w.plan ? AppColors.danger : AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -456,19 +673,13 @@ class _DailyPaceCard extends StatelessWidget {
     final isCurrent = today.year == month.year && today.month == month.month;
     final lastDay = isCurrent ? today.day : daysInMonth;
 
-    final maxY = [
-      ...cumActual,
-      ...cumPlan,
-      1.0,
-    ].reduce((a, b) => a > b ? a : b);
-
+    final maxY = [...cumActual, ...cumPlan, 1.0].reduce((a, b) => a > b ? a : b);
     final actualSpots = <FlSpot>[];
     for (var i = 0; i < lastDay && i < cumActual.length; i++) {
       actualSpots.add(FlSpot((i + 1).toDouble(), cumActual[i]));
     }
     final planSpots = <FlSpot>[
-      for (var i = 0; i < cumPlan.length; i++)
-        FlSpot((i + 1).toDouble(), cumPlan[i]),
+      for (var i = 0; i < cumPlan.length; i++) FlSpot((i + 1).toDouble(), cumPlan[i]),
     ];
 
     return AppCard(
@@ -485,16 +696,11 @@ class _DailyPaceCard extends StatelessWidget {
               show: true,
               drawVerticalLine: false,
               horizontalInterval: maxY > 0 ? maxY / 4 : 1,
-              getDrawingHorizontalLine: (_) => FlLine(
-                color: AppColors.muted,
-                strokeWidth: 1,
-              ),
+              getDrawingHorizontalLine: (_) => FlLine(color: AppColors.muted, strokeWidth: 1),
             ),
             titlesData: FlTitlesData(
-              topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
@@ -505,8 +711,7 @@ class _DailyPaceCard extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 4),
                       child: Text(
                         Fmt.currency(value, symbol: app.currency, decimals: 0),
-                        style: const TextStyle(
-                            fontSize: 9, color: AppColors.textSecondary),
+                        style: const TextStyle(fontSize: 9, color: AppColors.textSecondary),
                       ),
                     );
                   },
@@ -520,8 +725,7 @@ class _DailyPaceCard extends StatelessWidget {
                   getTitlesWidget: (value, meta) => Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text('${value.toInt()}',
-                        style: const TextStyle(
-                            fontSize: 10, color: AppColors.textSecondary)),
+                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                   ),
                 ),
               ),
@@ -542,10 +746,7 @@ class _DailyPaceCard extends StatelessWidget {
                 color: AppColors.expense,
                 barWidth: 2.5,
                 dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  color: AppColors.expense.withOpacity(0.10),
-                ),
+                belowBarData: BarAreaData(show: true, color: AppColors.expense.withOpacity(0.10)),
               ),
             ],
             lineTouchData: LineTouchData(
@@ -567,6 +768,171 @@ class _DailyPaceCard extends StatelessWidget {
   }
 }
 
+class _MonthComparisonCard extends StatelessWidget {
+  final MonthComparison comparison;
+  const _MonthComparisonCard({required this.comparison});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final expenseColor = comparison.expenseDelta <= 0 ? AppColors.income : AppColors.danger;
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DeltaLine(
+            label: 'Расходы',
+            value: comparison.expenseDelta,
+            suffix: comparison.expensePercent == 0 ? '' : ' (${comparison.expensePercent.toStringAsFixed(0)}%)',
+            goodWhenNegative: true,
+          ),
+          _DeltaLine(label: 'Доходы', value: comparison.incomeDelta, goodWhenNegative: false),
+          if (comparison.categoryDeltas.isNotEmpty) ...[
+            const Divider(height: 20),
+            for (final row in comparison.categoryDeltas.take(3))
+              Row(
+                children: [
+                  Text(row.emoji),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(row.name)),
+                  Text(
+                    '${row.delta >= 0 ? '+' : '−'}${Fmt.currency(row.delta.abs(), symbol: app.currency)}',
+                    style: TextStyle(
+                      color: row.delta <= 0 ? AppColors.income : expenseColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DeltaLine extends StatelessWidget {
+  final String label;
+  final double value;
+  final String suffix;
+  final bool goodWhenNegative;
+  const _DeltaLine({
+    required this.label,
+    required this.value,
+    this.suffix = '',
+    required this.goodWhenNegative,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final good = goodWhenNegative ? value <= 0 : value >= 0;
+    final color = good ? AppColors.income : AppColors.danger;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700))),
+          Text('${value >= 0 ? '+' : '−'}${Fmt.currency(value.abs(), symbol: app.currency)}$suffix',
+              style: TextStyle(color: color, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _EconomyModeCard extends StatelessWidget {
+  final List<EconomySuggestion> suggestions;
+  const _EconomyModeCard({required this.suggestions});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    if (suggestions.isEmpty) {
+      return const AppCard(
+        padding: EdgeInsets.all(16),
+        child: Text('Пока нечего сокращать: добавь расходы и бюджетные лимиты.',
+            style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+    final total = suggestions.fold<double>(0, (a, s) => a + s.monthlySaving);
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Потенциальная экономия: ${Fmt.currency(total, symbol: app.currency)}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.income)),
+          const SizedBox(height: 10),
+          for (final s in suggestions.take(4))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.savings_outlined, color: AppColors.income, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                        Text(s.message,
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Text(Fmt.currency(s.monthlySaving, symbol: app.currency),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForecastCard extends StatelessWidget {
+  final BudgetMetrics metrics;
+  const _ForecastCard({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final delta = metrics.plannedOutflow - metrics.forecast;
+    final color = delta >= 0 ? AppColors.income : AppColors.danger;
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(Fmt.currency(metrics.forecast, symbol: app.currency),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text('Прогноз учитывает текущий темп расходов и обязательные платежи.',
+              style: const TextStyle(color: AppColors.textSecondary)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              delta >= 0
+                  ? 'Останется по плану: ${Fmt.currency(delta, symbol: app.currency)}'
+                  : 'Превышение прогноза: ${Fmt.currency(delta.abs(), symbol: app.currency)}',
+              style: TextStyle(color: color, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CategoryRow extends StatelessWidget {
   final CategoryPlanFact row;
   const _CategoryRow({required this.row});
@@ -576,7 +942,7 @@ class _CategoryRow extends StatelessWidget {
     final app = context.watch<AppState>();
     final i18n = context.watch<I18n>();
     final color = Color(row.colorValue);
-    final overspent = row.delta > 0;
+    final overspent = row.delta > 0 && row.plan > 0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -589,14 +955,10 @@ class _CategoryRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
-                        child: Text(row.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600))),
+                    Expanded(child: Text(row.name, style: const TextStyle(fontWeight: FontWeight.w600))),
                     Text(
                       '${Fmt.currency(row.fact, symbol: app.currency)} / ${Fmt.currency(row.plan, symbol: app.currency)}',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -612,11 +974,11 @@ class _CategoryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  overspent
-                      ? '+${Fmt.currency(row.delta, symbol: app.currency)} ${i18n.t('over_plan')}'
-                      : (row.plan == 0
-                          ? '—'
-                          : '${Fmt.currency(-row.delta, symbol: app.currency)} ${i18n.t('under_plan')}'),
+                  row.plan == 0
+                      ? 'Лимит не задан'
+                      : overspent
+                          ? '+${Fmt.currency(row.delta, symbol: app.currency)} ${i18n.t('over_plan')}'
+                          : '${Fmt.currency(row.remaining, symbol: app.currency)} осталось · ${Fmt.currency(row.weeklyLimit, symbol: app.currency)} / неделя',
                   style: TextStyle(
                     fontSize: 11,
                     color: overspent ? AppColors.danger : AppColors.income,
@@ -632,41 +994,6 @@ class _CategoryRow extends StatelessWidget {
   }
 }
 
-class _BudgetHealthBadge extends StatelessWidget {
-  final double forecast;
-  final double? plan;
-  const _BudgetHealthBadge({required this.forecast, this.plan});
-
-  @override
-  Widget build(BuildContext context) {
-    final i18n = context.watch<I18n>();
-    String label;
-    Color color;
-    if (plan == null || plan == 0) {
-      label = '—';
-      color = AppColors.textSecondary;
-    } else if (forecast > plan! * 1.05) {
-      label = i18n.t('risk');
-      color = AppColors.danger;
-    } else if (forecast > plan! * 0.85) {
-      label = i18n.t('warning');
-      color = AppColors.warning;
-    } else {
-      label = i18n.t('good');
-      color = AppColors.income;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(10)),
-      child: Text('${i18n.t('budget_health')}: $label',
-          style: TextStyle(
-              color: color, fontWeight: FontWeight.w700, fontSize: 13)),
-    );
-  }
-}
-
 class _AdvicesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -675,6 +1002,7 @@ class _AdvicesCard extends StatelessWidget {
       i18n.t('tip_save_more'),
       i18n.t('tip_track'),
       i18n.t('tip_emergency'),
+      'Разделяй обязательные платежи и переменные расходы — так бюджет честнее.',
     ];
     return Column(
       children: [
@@ -690,8 +1018,7 @@ class _AdvicesCard extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                       child: Text(tips[i],
-                          style: const TextStyle(
-                              color: AppColors.textPrimary, fontSize: 14))),
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14))),
                 ],
               ),
             ),
@@ -701,7 +1028,7 @@ class _AdvicesCard extends StatelessWidget {
   }
 }
 
-/// Bottom-sheet planner: per-category limits + auto-distribution + live free-funds preview.
+/// Bottom-sheet planner: income + fixed costs + per-category limits + auto-distribution.
 class BudgetPlannerSheet extends StatefulWidget {
   final DateTime month;
   final MonthlyBudget? existing;
@@ -713,6 +1040,7 @@ class BudgetPlannerSheet extends StatefulWidget {
 
 class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
   late TextEditingController _incomeCtrl;
+  late TextEditingController _fixedCtrl;
   late Map<String, TextEditingController> _limitCtrls;
 
   @override
@@ -722,6 +1050,10 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
         text: widget.existing?.income == null || widget.existing!.income == 0
             ? ''
             : widget.existing!.income.toStringAsFixed(0));
+    _fixedCtrl = TextEditingController(
+        text: widget.existing == null || widget.existing!.fixedCostsTotal == 0
+            ? ''
+            : widget.existing!.fixedCostsTotal.toStringAsFixed(0));
     _limitCtrls = {};
     for (final l in widget.existing?.limits ?? const <CategoryLimit>[]) {
       _limitCtrls[l.categoryId] = TextEditingController(
@@ -732,14 +1064,15 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
   @override
   void dispose() {
     _incomeCtrl.dispose();
+    _fixedCtrl.dispose();
     for (final c in _limitCtrls.values) {
       c.dispose();
     }
     super.dispose();
   }
 
-  double get _income =>
-      double.tryParse(_incomeCtrl.text.replaceAll(',', '.')) ?? 0;
+  double get _income => double.tryParse(_incomeCtrl.text.replaceAll(',', '.')) ?? 0;
+  double get _fixed => double.tryParse(_fixedCtrl.text.replaceAll(',', '.')) ?? 0;
 
   double get _sumLimits {
     double s = 0;
@@ -753,10 +1086,8 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
     _limitCtrls.putIfAbsent(id, () => TextEditingController());
   }
 
-  void _applyDistribution(
-      DistributionStrategy strategy, AppState app) {
+  void _applyDistribution(DistributionStrategy strategy, AppState app) {
     final txCats = app.categoriesByScope('tx');
-    // Build historical map from previous 3 months.
     final hist = <String, double>{};
     for (var i = 1; i <= 3; i++) {
       final m = DateTime(widget.month.year, widget.month.month - i);
@@ -771,9 +1102,9 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
       income: _income,
       historicalSpendByCat: hist,
       fallbackCategories: txCats,
+      fixedCosts: _fixed,
     );
     setState(() {
-      // Reset all current to empty first, then fill.
       for (final c in _limitCtrls.values) {
         c.text = '';
       }
@@ -790,13 +1121,13 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
     final i18n = context.watch<I18n>();
     final txCats = app.categoriesByScope('tx');
 
-    // Pre-create controllers for existing tx categories.
     for (final c in txCats) {
       _ensureCtrl(c.id);
     }
 
     final sum = _sumLimits;
-    final free = _income - sum;
+    final plannedOutflow = sum + _fixed;
+    final free = _income - plannedOutflow;
     final negative = free < 0;
 
     return SingleChildScrollView(
@@ -804,16 +1135,11 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-              widget.existing == null
-                  ? i18n.t('create_budget')
-                  : i18n.t('edit'),
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(widget.existing == null ? i18n.t('create_budget') : i18n.t('edit'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           Text(i18n.t('income_label'),
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12)),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           const SizedBox(height: 6),
           TextField(
             controller: _incomeCtrl,
@@ -822,30 +1148,29 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 14),
+          const Text('Обязательные платежи и подписки',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _fixedCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              hintText: 'Аренда, коммуналка, кредиты, подписки',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
           Text(i18n.t('auto_distribute'),
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12)),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _DistChip(
-                  label: i18n.t('distribute_50_30_20'),
-                  onTap: () => _applyDistribution(
-                      DistributionStrategy.fiftyThirtyTwenty, app)),
-              _DistChip(
-                  label: i18n.t('distribute_zero'),
-                  onTap: () => _applyDistribution(
-                      DistributionStrategy.zeroBased, app)),
-              _DistChip(
-                  label: i18n.t('distribute_envelope'),
-                  onTap: () => _applyDistribution(
-                      DistributionStrategy.envelope, app)),
-              _DistChip(
-                  label: i18n.t('distribute_proportional'),
-                  onTap: () => _applyDistribution(
-                      DistributionStrategy.proportional, app)),
+              _DistChip(label: i18n.t('distribute_50_30_20'), onTap: () => _applyDistribution(DistributionStrategy.fiftyThirtyTwenty, app)),
+              _DistChip(label: i18n.t('distribute_zero'), onTap: () => _applyDistribution(DistributionStrategy.zeroBased, app)),
+              _DistChip(label: i18n.t('distribute_envelope'), onTap: () => _applyDistribution(DistributionStrategy.envelope, app)),
+              _DistChip(label: i18n.t('distribute_proportional'), onTap: () => _applyDistribution(DistributionStrategy.proportional, app)),
             ],
           ),
           const SizedBox(height: 16),
@@ -855,35 +1180,29 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
               color: AppColors.muted,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: _MiniStat(
-                      label: i18n.t('income'),
-                      value:
-                          Fmt.currency(_income, symbol: app.currency),
-                      color: AppColors.income),
+                Row(
+                  children: [
+                    Expanded(child: _MiniStat(label: i18n.t('income'), value: Fmt.currency(_income, symbol: app.currency), color: AppColors.income)),
+                    Expanded(child: _MiniStat(label: 'Обязательные', value: Fmt.currency(_fixed, symbol: app.currency), color: AppColors.warning)),
+                    Expanded(child: _MiniStat(label: i18n.t('sum_of_limits'), value: Fmt.currency(sum, symbol: app.currency), color: AppColors.expense)),
+                  ],
                 ),
-                Expanded(
-                  child: _MiniStat(
-                      label: i18n.t('sum_of_limits'),
-                      value: Fmt.currency(sum, symbol: app.currency),
-                      color: AppColors.expense),
-                ),
-                Expanded(
-                  child: _MiniStat(
-                      label: i18n.t('free_funds'),
-                      value: Fmt.currency(free, symbol: app.currency),
-                      color: negative ? AppColors.danger : AppColors.primary,
-                      subtitle: negative ? i18n.t('in_minus') : null),
+                const Divider(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: Text(i18n.t('free_funds'))),
+                    Text(Fmt.currency(free, symbol: app.currency),
+                        style: TextStyle(color: negative ? AppColors.danger : AppColors.primary, fontWeight: FontWeight.w900)),
+                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 18),
           Text(i18n.t('category_limits'),
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           for (final c in txCats)
             _CategoryLimitField(
@@ -907,21 +1226,25 @@ class _BudgetPlannerSheetState extends State<BudgetPlannerSheet> {
                   onPressed: () {
                     final limits = <CategoryLimit>[];
                     for (final entry in _limitCtrls.entries) {
-                      final v = double.tryParse(
-                              entry.value.text.replaceAll(',', '.')) ??
-                          0;
-                      if (v > 0) {
-                        limits
-                            .add(CategoryLimit(categoryId: entry.key, limit: v));
-                      }
+                      final v = double.tryParse(entry.value.text.replaceAll(',', '.')) ?? 0;
+                      if (v > 0) limits.add(CategoryLimit(categoryId: entry.key, limit: v));
                     }
-                    final total =
-                        limits.fold<double>(0, (a, l) => a + l.limit);
+                    final total = limits.fold<double>(0, (a, l) => a + l.limit);
+                    final fixedCosts = <FixedBudgetItem>[];
+                    if (_fixed > 0) {
+                      fixedCosts.add(FixedBudgetItem(
+                        id: 'fixed_${Fmt.monthKey(widget.month)}',
+                        name: 'Обязательные платежи и подписки',
+                        amount: _fixed,
+                        subscription: true,
+                      ));
+                    }
                     Navigator.of(context).pop(MonthlyBudget(
                       monthKey: Fmt.monthKey(widget.month),
                       income: _income,
                       totalLimit: total,
                       limits: limits,
+                      fixedCosts: fixedCosts,
                       template: widget.existing?.template,
                     ));
                   },
@@ -956,29 +1279,16 @@ class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final String? subtitle;
-  const _MiniStat({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.subtitle,
-  });
+  const _MiniStat({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 11)),
+        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
         const SizedBox(height: 4),
-        Text(value,
-            style: TextStyle(
-                color: color, fontWeight: FontWeight.w800, fontSize: 14)),
-        if (subtitle != null)
-          Text(subtitle!,
-              style: TextStyle(color: color, fontSize: 10)),
+        Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 14)),
       ],
     );
   }
@@ -1005,22 +1315,14 @@ class _CategoryLimitField extends StatelessWidget {
         children: [
           IconBadge(emoji: emoji, bg: category.color.withOpacity(0.15)),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(category.name,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
+          Expanded(child: Text(category.name, style: const TextStyle(fontWeight: FontWeight.w600))),
           SizedBox(
             width: 130,
             child: TextField(
               controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: '0',
-                suffixText: currency,
-              ),
+              decoration: InputDecoration(isDense: true, hintText: '0', suffixText: currency),
               onChanged: (_) => onChanged(),
             ),
           ),
