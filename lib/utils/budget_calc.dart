@@ -52,11 +52,13 @@ class BudgetMetrics {
     required this.safePerDay,
   });
 
-  double get variableUsage =>
-      plannedExpense > 0 ? (expense / plannedExpense).clamp(0.0, 999.0) : 0.0;
+  double get variableUsage => plannedExpense > 0
+      ? (expense / plannedExpense).clamp(0.0, 999.0).toDouble()
+      : 0.0;
 
-  double get outflowUsage =>
-      plannedOutflow > 0 ? ((expense + fixedCosts) / plannedOutflow).clamp(0.0, 999.0) : 0.0;
+  double get outflowUsage => plannedOutflow > 0
+      ? ((expense + fixedCosts) / plannedOutflow).clamp(0.0, 999.0).toDouble()
+      : 0.0;
 
   double get projectedDelta => plannedOutflow - forecast;
 
@@ -123,7 +125,7 @@ List<double> cumulativeSpentByDay({
   final perDay = List<double>.filled(daysInMonth, 0);
   for (final t in txInMonth.where((t) => t.type == TxType.expense)) {
     if (t.date.year != month.year || t.date.month != month.month) continue;
-    final i = (t.date.day - 1).clamp(0, daysInMonth - 1);
+    final i = (t.date.day - 1).clamp(0, daysInMonth - 1).toInt();
     perDay[i] += t.amount;
   }
   final cum = List<double>.filled(daysInMonth, 0);
@@ -166,8 +168,9 @@ class CategoryPlanFact {
 
   double get delta => fact - plan;
   double get remaining => (plan - fact).clamp(0, double.infinity).toDouble();
-  double get progress =>
-      plan > 0 ? (fact / plan).clamp(0.0, 1.0) : (fact > 0 ? 1.0 : 0.0);
+  double get progress => plan > 0
+      ? (fact / plan).clamp(0.0, 1.0).toDouble()
+      : (fact > 0 ? 1.0 : 0.0);
   double get weeklyLimit => plan / 4.345;
 }
 
@@ -305,7 +308,7 @@ BudgetHealthReport budgetHealthReport({
   if (metrics.variableUsage > 0.9) score -= 15;
   if (metrics.fixedCosts > metrics.plannedIncome * 0.5 && metrics.plannedIncome > 0) score -= 10;
   score -= categories.where((c) => c.plan > 0 && c.fact > c.plan).length * 5;
-  score = score.clamp(0, 100);
+  score = score.clamp(0, 100).toInt();
 
   if (score >= 80) {
     return BudgetHealthReport(
@@ -406,7 +409,7 @@ class WeeklyBudget {
   });
 
   double get remaining => (plan - fact).clamp(0, double.infinity).toDouble();
-  double get progress => plan > 0 ? (fact / plan).clamp(0.0, 1.0) : 0.0;
+  double get progress => plan > 0 ? (fact / plan).clamp(0.0, 1.0).toDouble() : 0.0;
 }
 
 List<WeeklyBudget> weeklyBudgets({
@@ -446,8 +449,7 @@ List<EconomySuggestion> economySuggestions({
   required BudgetMetrics metrics,
   required List<CategoryPlanFact> categories,
 }) {
-  final top = [...categories]
-    ..sort((a, b) => b.fact.compareTo(a.fact));
+  final top = [...categories]..sort((a, b) => b.fact.compareTo(a.fact));
   final suggestions = <EconomySuggestion>[];
 
   for (final row in top.take(3)) {
@@ -493,20 +495,9 @@ String daysWord({
   return many;
 }
 
-enum DistributionStrategy {
-  fiftyThirtyTwenty,
-  zeroBased,
-  envelope,
-  proportional,
-}
+enum DistributionStrategy { fiftyThirtyTwenty, zeroBased, envelope, proportional }
 
 /// Suggest per-category limits based on historical spend (last few months).
-///
-/// - 50/30/20: split totalLimit across categories proportionally to historical
-///   share, then clamp by 80% of income (20% savings buffer).
-/// - zero: distribute totalLimit = income proportionally to historical share.
-/// - envelope: distribute 90% of income proportionally to historical share.
-/// - proportional: distribute 85% of income proportionally to historical share.
 List<CategoryLimit> suggestDistribution({
   required DistributionStrategy strategy,
   required double income,
@@ -532,8 +523,7 @@ List<CategoryLimit> suggestDistribution({
   }
   if (targetTotal <= 0) return const [];
 
-  final totalSpent =
-      historicalSpendByCat.values.fold<double>(0, (a, b) => a + b);
+  final totalSpent = historicalSpendByCat.values.fold<double>(0, (a, b) => a + b);
   if (totalSpent > 0) {
     return historicalSpendByCat.entries
         .map((e) => CategoryLimit(
